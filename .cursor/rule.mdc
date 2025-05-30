@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+When I prompt you to perform a task, focus only on the specific instruction or file I’ve indicated. Do not make changes to other files, components, or pages unless explicitly requested. Prioritize fixing the issue without generating or adding new code unless it's necessary to resolve the problem.

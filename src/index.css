@@ -1,0 +1,287 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-primary: 221.2 83.2% 53.3%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 221.2 83.2% 53.3%;
+    
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    
+    --sidebar-background: 222.2 84% 4.9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217.2 91.2% 59.8%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-ring: 224.3 76.3% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Custom scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/40;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted/80;
+  }
+}
+
+@layer components {
+  .stats-card {
+    @apply bg-secondary/50 rounded-lg p-6 backdrop-blur-sm border border-border/30;
+  }
+  
+  .table-header {
+    @apply text-sm text-muted-foreground font-medium;
+  }
+  
+  .table-cell {
+    @apply py-3 text-left;
+  }
+  
+  .table-row {
+    @apply border-b border-border/20 hover:bg-secondary/40 transition-colors;
+  }
+  
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2 rounded-md text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-secondary/50 transition-colors;
+  }
+  
+  .sidebar-link.active {
+    @apply bg-secondary/70 text-sidebar-foreground;
+  }
+}
+
+/* Page loader animations */
+@keyframes page-loader-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes page-loader-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Minimal travel-themed loader */
+.loader-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.loader-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 40px;
+  height: 2px;
+  background-color: #e2e8f0; /* slate-200 */
+  transform: translateY(-50%);
+  overflow: hidden;
+}
+
+.loader-line::before {
+  content: "";
+  position: absolute;
+  left: -100%;
+  width: 40px;
+  height: 2px;
+  background-color: #10b981; /* emerald-500 */
+  animation: line-travel 1.5s ease-in-out infinite;
+}
+
+.loader-pin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #10b981; /* emerald-500 */
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+  transform: translate(-50%, -50%);
+  animation: pin-move 1.5s ease-in-out infinite;
+}
+
+@keyframes line-travel {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes pin-move {
+  0% {
+    left: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    left: 100%;
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+}
+
+/* Dot loader styles */
+.loader-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.loader-dots .dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981; /* emerald-500 */
+  opacity: 0.6;
+}
+
+.loader-dots .dot:nth-child(1) {
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+
+.loader-dots .dot:nth-child(2) {
+  animation: dot-pulse 1.2s ease-in-out 0.4s infinite;
+}
+
+.loader-dots .dot:nth-child(3) {
+  animation: dot-pulse 1.2s ease-in-out 0.8s infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes plane-fly {
+  0% {
+    transform: rotate(0deg) translateX(0) translateY(0);
+  }
+  25% {
+    transform: rotate(90deg) translateX(5px) translateY(-5px);
+  }
+  50% {
+    transform: rotate(180deg) translateX(0) translateY(-10px);
+  }
+  75% {
+    transform: rotate(270deg) translateX(-5px) translateY(-5px);
+  }
+  100% {
+    transform: rotate(360deg) translateX(0) translateY(0);
+  }
+}
+
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-orbit {
+  animation: orbit 3s linear infinite;
+}
+
+.page-loader-enter {
+  animation: page-loader-fade-in 0.3s ease forwards;
+}
+
+.page-loader-exit {
+  animation: page-loader-fade-out 0.3s ease forwards;
+}

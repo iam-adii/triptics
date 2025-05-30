@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Triptics - React Scheduler Fix</title>
+</head>
+<body>
+  <script>
+    // Create a full polyfill for the scheduler
+    window.scheduler = {
+      unstable_scheduleCallback: function(priorityLevel, callback, options) {
+        const delay = options && typeof options.delay === 'number' ? options.delay : 0;
+        const timeoutId = setTimeout(function() {
+          callback({
+            timeRemaining: function() { return Infinity; }
+          });
+        }, delay);
+        return { id: timeoutId };
+      },
+      unstable_cancelCallback: function(callbackNode) {
+        if (callbackNode && callbackNode.id) {
+          clearTimeout(callbackNode.id);
+        }
+      },
+      unstable_shouldYield: function() { return false; },
+      unstable_requestPaint: function() {},
+      unstable_now: function() { return Date.now(); },
+      unstable_getCurrentPriorityLevel: function() { return 3; },
+      unstable_ImmediatePriority: 1,
+      unstable_UserBlockingPriority: 2,
+      unstable_NormalPriority: 3,
+      unstable_LowPriority: 4,
+      unstable_IdlePriority: 5
+    };
+
+    // Create Scheduler tracing for React 18
+    window.SchedulerTracing = {
+      __interactionsRef: { current: null },
+      __subscriberRef: { current: null },
+      unstable_clear: function(callback) { return callback(); },
+      unstable_getCurrent: function() { return null; },
+      unstable_getThreadID: function() { return ++window.SchedulerTracing.unstable_threadID; },
+      unstable_trace: function(name, timestamp, callback) { return callback(); },
+      unstable_wrap: function(callback) { return callback; },
+      unstable_subscribe: function() {},
+      unstable_unsubscribe: function() {},
+      unstable_threadID: 0
+    };
+
+    // Redirect to the application after setting up the polyfill
+    setTimeout(function() {
+      window.location.href = "./index.html";
+    }, 100);
+  </script>
+</body>
+</html> 
