@@ -1,6 +1,7 @@
 export interface Itinerary {
   id: string;
-  name: string;
+  title: string;
+  description?: string;
   destination?: string;
   client_id?: string;
   status: string;
@@ -8,11 +9,14 @@ export interface Itinerary {
   end_date?: string;
   duration?: number;
   budget?: number;
+  total_price?: number;
   notes?: string;
   transfer_included?: 'yes' | 'no' | 'partial';
   created_at?: string;
   updated_at?: string;
   customers?: Customer | null;
+  customer_email?: string;
+  customer_phone?: string;
 }
 
 export interface Customer {
@@ -27,11 +31,11 @@ export interface ItineraryDay {
   itinerary_id: string;
   day_number: number;
   date?: string;
+  created_at?: string;
+  updated_at?: string;
   hotel_id?: string;
   cab_type?: string;
   hotel?: Hotel;
-  created_at?: string;
-  updated_at?: string;
 }
 
 export interface Hotel {

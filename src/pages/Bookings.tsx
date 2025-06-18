@@ -50,10 +50,10 @@ interface Customer {
   email: string;
 }
 
-interface Tour {
+interface Itinerary {
   id: string;
   name: string;
-  location: string;
+  destination: string;
 }
 
 // Use simpler type structure to avoid deep instantiation
@@ -65,14 +65,14 @@ interface Booking {
   status: string;
   total_amount: number;
   customers: { id: string; name: string; email: string } | null;
-  tours: { id: string; name: string; location: string } | null;
+  itineraries: { id: string; name: string; destination: string } | null;
   notes?: string;
   payments?: {
     id: string;
     amount: number;
     status: string;
-    date: string;
-    method: string;
+    payment_date: string;
+    payment_method: string;
   }[];
   created_at: string;
 }
@@ -81,7 +81,7 @@ interface Booking {
 interface FormBooking {
   id?: string;
   customer_id?: string;
-  tour_id?: string;
+  itinerary_id?: string;
   start_date?: Date;
   end_date?: Date;
   status?: string;
@@ -94,8 +94,8 @@ interface Payment {
   id: string;
   amount: number;
   status: string;
-  date: string;
-  method: string;
+  payment_date: string;
+  payment_method: string;
   booking_id?: string;
   payment_id?: string;
 }
@@ -150,13 +150,13 @@ export default function Bookings() {
           total_amount,
           created_at,
           customers (id, name, email),
-          tours (id, name, location),
+          itineraries (id, name, destination),
           payments (
             id,
             amount,
             status,
-            method,
-            date
+            payment_method,
+            payment_date
           )
         `);
       
@@ -197,7 +197,7 @@ export default function Bookings() {
         const search = debouncedSearchTerm.toLowerCase();
         filtered = filtered.filter(b =>
           (b.customers?.name && b.customers.name.toLowerCase().includes(search)) ||
-          (b.tours?.name && b.tours.name.toLowerCase().includes(search))
+          (b.itineraries?.name && b.itineraries.name.toLowerCase().includes(search))
         );
       }
 
@@ -272,7 +272,7 @@ export default function Bookings() {
     const formattedBooking: FormBooking = {
       id: booking.id,
       customer_id: booking.customers?.id,
-      tour_id: booking.tours?.id,
+      itinerary_id: booking.itineraries?.id,
       start_date: startDate,
       end_date: endDate,
       status: booking.status,
@@ -458,71 +458,49 @@ export default function Bookings() {
 
   // Calculate payment status based on all payments for the booking
   const calculatePaymentStatus = (booking: Booking) => {
-    if (!booking.payments || booking.payments.length === 0) {
-      return {
-        status: "Unpaid",
-        color: "bg-red-500/20 text-red-500",
-        totalPaid: 0,
-        remainingAmount: booking.total_amount,
-        percentPaid: 0
-      };
-    }
-
-    // Always sum all completed payments for this booking
-    const totalPaid = booking.payments
-      .filter(p => p.status === "Completed")
-      .reduce((sum, p) => sum + p.amount, 0);
+    // Default status
+    let status = "Unpaid";
+    let color = "text-red-500";
+    let amount = 0;
+    let percentage = 0;
     
-    const remainingAmount = booking.total_amount - totalPaid;
-
-    // Calculate percentage paid (rounded to nearest integer)
-    const percentPaid = Math.round((totalPaid / booking.total_amount) * 100);
-
-    // To handle floating point precision issues, we check if remaining amount is very small
-    // and consider it fully paid if it's less than 1 unit of currency
-    if (remainingAmount <= 1) {
-      return {
-        status: "Paid",
-        color: "bg-emerald-500/20 text-emerald-500",
-        totalPaid: booking.total_amount, // Ensure we show the full amount to avoid confusion
-        remainingAmount: 0,
-        percentPaid: 100
-      };
-    } else if (totalPaid > 0) {
-      return {
-        status: "Partial",
-        color: "bg-yellow-500/20 text-yellow-500",
-        totalPaid,
-        remainingAmount,
-        percentPaid
-      };
-    } else {
-      return {
-        status: "Unpaid",
-        color: "bg-red-500/20 text-red-500",
-        totalPaid: 0,
-        remainingAmount: booking.total_amount,
-        percentPaid: 0
-      };
+    // Calculate total paid amount
+    if (booking.payments && booking.payments.length > 0) {
+      const totalPaid = booking.payments.reduce((sum, payment) => 
+        payment.status.toLowerCase() === "completed" ? sum + payment.amount : sum, 0);
+      
+      amount = totalPaid;
+      percentage = Math.round((totalPaid / booking.total_amount) * 100);
+      
+      if (percentage >= 100) {
+        status = "Paid";
+        color = "text-green-500";
+      } else if (percentage > 0) {
+        status = "Partial";
+        color = "text-amber-500";
+      }
     }
+    
+    return { status, color, amount, percentage };
   };
 
   // Handle viewing payment details
   const handleViewPayment = (booking: Booking) => {
-    // Find the latest payment or create a placeholder if no payments
-    const latestPayment = booking.payments && booking.payments.length > 0 
-      ? booking.payments[booking.payments.length - 1] 
-      : {
-          id: "no-payment",
-          amount: 0,
-          status: "Unpaid",
-          date: new Date().toISOString(),
-          method: "None",
-          booking_id: booking.id
-        };
-    
-    setSelectedPaymentForView({...latestPayment, booking_id: booking.id});
-    setIsPaymentDetailDialogOpen(true);
+    // If there are payments, set the first one as selected
+    if (booking.payments && booking.payments.length > 0) {
+      const payment = booking.payments[0];
+      setSelectedPaymentForView({
+        id: payment.id,
+        booking_id: booking.id,
+        amount: payment.amount,
+        status: payment.status,
+        payment_date: payment.payment_date,
+        payment_method: payment.payment_method
+      });
+      setIsPaymentDetailDialogOpen(true);
+    } else {
+      toast.info("No payments found for this booking");
+    }
   };
 
   // Handle updating payment status
@@ -539,8 +517,8 @@ export default function Bookings() {
             booking_id: selectedPaymentForView.booking_id,
             amount: 0, // Placeholder amount
             status: newStatus,
-            date: new Date().toISOString(),
-            method: "None",
+            payment_date: new Date().toISOString(),
+            payment_method: "None",
             payment_id: `PAY-${Date.now().toString().slice(-6)}`
           });
         if (error) throw error;
@@ -739,7 +717,7 @@ export default function Bookings() {
             <TableRow className="hover:bg-transparent">
               <TableHead>Booking ID</TableHead>
               <TableHead>Customer</TableHead>
-              <TableHead>Tour</TableHead>
+              <TableHead>Itinerary</TableHead>
               <TableHead>Booking Date</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Status</TableHead>
@@ -768,23 +746,23 @@ export default function Bookings() {
                 <TableRow key={booking.id}>
                   <TableCell>{formatBookingId(booking.id)}</TableCell>
                   <TableCell>{booking.customers?.name || "Unknown Customer"}</TableCell>
-                  <TableCell>{booking.tours?.name || "Unknown Tour"}</TableCell>
+                  <TableCell>{booking.itineraries?.name || "Unknown Itinerary"}</TableCell>
                   <TableCell>{booking.created_at ? format(new Date(booking.created_at), "MMM d, yyyy") : "-"}</TableCell>
                   <TableCell>₹{booking.total_amount.toLocaleString()}</TableCell>
                   <TableCell>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         booking.status === "Confirmed"
-                          ? "bg-green-500/20 text-green-500"
+                          ? "bg-green-100 text-green-500"
                           : booking.status === "Pending"
-                          ? "bg-yellow-500/20 text-yellow-500"
+                          ? "bg-yellow-100 text-yellow-500"
                           : booking.status === "Cancelled"
-                          ? "bg-red-500/20 text-red-500"
+                          ? "bg-red-100 text-red-500"
                           : booking.status === "In Progress"
-                          ? "bg-blue-500/20 text-blue-500"
+                          ? "bg-blue-100 text-blue-500"
                           : booking.status === "Completed"
-                          ? "bg-emerald-500/20 text-emerald-500"
-                          : "bg-purple-500/20 text-purple-500"
+                          ? "bg-emerald-100 text-emerald-500"
+                          : "bg-purple-100 text-purple-500"
                       }`}
                     >
                       {booking.status}
@@ -799,7 +777,9 @@ export default function Bookings() {
                         <div className="flex flex-col gap-1">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              paymentStatus.color
+                              paymentStatus.status === "Paid" ? "bg-green-100 text-green-500" :
+                              paymentStatus.status === "Partial" ? "bg-amber-100 text-amber-500" :
+                              "bg-red-100 text-red-500"
                             }`}
                           >
                             {paymentStatus.status}
@@ -811,26 +791,26 @@ export default function Bookings() {
                               <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
                                 <div 
                                   className="bg-emerald-500 h-1.5 rounded-full" 
-                                  style={{ width: `${paymentStatus.percentPaid}%` }}
+                                  style={{ width: `${paymentStatus.percentage}%` }}
                                 ></div>
                               </div>
                               <span className="text-xs">
-                                <span className="text-emerald-500 font-medium">₹{paymentStatus.totalPaid.toLocaleString()}</span> paid
-                                <span className="text-muted-foreground ml-1">({paymentStatus.percentPaid}%)</span>
+                                <span className="text-emerald-500 font-medium">₹{paymentStatus.amount.toLocaleString()}</span> paid
+                                <span className="text-muted-foreground ml-1">({paymentStatus.percentage}%)</span>
                               </span>
                               <span className="text-xs font-medium text-red-500">
-                                ₹{paymentStatus.remainingAmount.toLocaleString()} remaining
+                                ₹{(booking.total_amount - paymentStatus.amount).toLocaleString()} remaining
                               </span>
                             </>
                           )}
                           {paymentStatus.status === "Unpaid" && (
                             <span className="text-xs text-red-500 font-medium">
-                              ₹{paymentStatus.remainingAmount.toLocaleString()} due
+                              ₹{(booking.total_amount - paymentStatus.amount).toLocaleString()} due
                             </span>
                           )}
                           {paymentStatus.status === "Paid" && (
                             <span className="text-xs text-emerald-500 font-medium">
-                              ₹{paymentStatus.totalPaid.toLocaleString()} paid in full
+                              ₹{paymentStatus.amount.toLocaleString()} paid in full
                             </span>
                           )}
                         </div>
@@ -841,9 +821,6 @@ export default function Bookings() {
                     <div className="flex items-center gap-1 justify-end">
                       <Button variant="ghost" size="sm" onClick={() => handleViewBooking(booking)} title="View Details" className="h-8 w-8 p-0">
                         <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleViewPayment(booking)} title="View Payment" className="h-8 w-8 p-0">
-                        <CreditCard className="h-4 w-4" />
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -869,7 +846,7 @@ export default function Bookings() {
                           <DropdownMenuItem onClick={() => handleEditBooking(booking)}>Edit Booking</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleProcessPayment(booking)}>Process Payment</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleViewItinerary(booking)}>View Itinerary</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleSendConfirmation(booking)}>Send Confirmation</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleSendConfirmation(booking)}>Send Itinerary</DropdownMenuItem>
                           <DropdownMenuItem 
                             className="text-red-500"
                             onClick={() => handleDeleteBooking(booking.id)}
@@ -958,8 +935,8 @@ export default function Bookings() {
                 </div>
                 
                 <div className="space-y-2">
-                  <div className="text-xs text-muted-foreground">Tour</div>
-                  <div className="font-medium">{viewBooking.tours?.name || "Unknown Tour"}</div>
+                  <div className="text-xs text-muted-foreground">Itinerary</div>
+                  <div className="font-medium">{viewBooking.itineraries?.name || "Unknown Itinerary"}</div>
                 </div>
               </div>
               
@@ -1009,7 +986,9 @@ export default function Bookings() {
                       <h3 className="font-semibold">Payment Status</h3>
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                          paymentStatus.color
+                          paymentStatus.status === "Paid" ? "bg-green-100 text-green-500" :
+                          paymentStatus.status === "Partial" ? "bg-amber-100 text-amber-500" :
+                          "bg-red-100 text-red-500"
                         }`}
                       >
                         {paymentStatus.status}
@@ -1022,12 +1001,12 @@ export default function Bookings() {
                         <div>
                           <div className="flex justify-between text-xs mb-1.5">
                             <span>Payment Progress</span>
-                            <span className="font-medium">{paymentStatus.percentPaid}%</span>
+                            <span className="font-medium">{paymentStatus.percentage}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2.5">
                             <div 
                               className={`${paymentStatus.status === "Paid" ? "bg-emerald-500" : "bg-yellow-500"} h-2.5 rounded-full`}
-                              style={{ width: `${paymentStatus.percentPaid}%` }}
+                              style={{ width: `${paymentStatus.percentage}%` }}
                             ></div>
                           </div>
                         </div>
@@ -1042,15 +1021,15 @@ export default function Bookings() {
                         
                         <div className="p-2 bg-muted/50 rounded">
                           <div className="text-xs text-muted-foreground mb-1">Paid</div>
-                          <div className={`font-medium ${paymentStatus.totalPaid > 0 ? "text-emerald-500" : ""}`}>
-                            ₹{paymentStatus.totalPaid.toLocaleString()}
+                          <div className={`font-medium ${paymentStatus.amount > 0 ? "text-emerald-500" : ""}`}>
+                            ₹{paymentStatus.amount.toLocaleString()}
                           </div>
                         </div>
                         
                         <div className="p-2 bg-muted/50 rounded">
                           <div className="text-xs text-muted-foreground mb-1">Remaining</div>
-                          <div className={`font-medium ${paymentStatus.remainingAmount > 0 ? "text-red-500" : "text-emerald-500"}`}>
-                            ₹{paymentStatus.remainingAmount.toLocaleString()}
+                          <div className={`font-medium ${paymentStatus.amount < viewBooking.total_amount ? "text-red-500" : "text-emerald-500"}`}>
+                            ₹{(viewBooking.total_amount - paymentStatus.amount).toLocaleString()}
                           </div>
                         </div>
                       </div>
@@ -1071,13 +1050,13 @@ export default function Bookings() {
                               <tbody className="divide-y">
                                 {viewBooking.payments.map(payment => (
                                   <tr key={payment.id}>
-                                    <td className="px-3 py-2">{format(new Date(payment.date), "MMM d, yyyy")}</td>
+                                    <td className="px-3 py-2">{format(new Date(payment.payment_date), "MMM d, yyyy")}</td>
                                     <td className="px-3 py-2 text-right">₹{payment.amount.toLocaleString()}</td>
                                     <td className="px-3 py-2 text-right">
                                       <span className={`inline-flex text-xs px-2 py-1 rounded-full ${
-                                        payment.status === "Completed" ? "bg-emerald-500/20 text-emerald-500" :
-                                        payment.status === "Pending" ? "bg-yellow-500/20 text-yellow-500" :
-                                        "bg-red-500/20 text-red-500"
+                                        payment.status === "Completed" ? "bg-emerald-100 text-emerald-500" :
+                                        payment.status === "Pending" ? "bg-yellow-100 text-yellow-500" :
+                                        "bg-red-100 text-red-500"
                                       }`}>
                                         {payment.status}
                                       </span>
@@ -1155,9 +1134,9 @@ export default function Bookings() {
             booking_id: selectedBookingForPayment?.id,
             amount: selectedBookingForPayment?.total_amount,
             payment_id: `PAY-${Date.now().toString().slice(-6)}`,
-            date: new Date(),
+            payment_date: new Date(),
             status: "Pending",
-            method: "Credit Card"
+            payment_method: "Credit Card"
           }}
           onSuccess={handlePaymentSuccess}
           onCancel={() => {
@@ -1189,8 +1168,8 @@ export default function Bookings() {
               <div>
                 <div className="text-xs text-muted-foreground">Payment Date</div>
                 <div>
-                  {selectedPaymentForView.date 
-                    ? format(new Date(selectedPaymentForView.date), "MMM d, yyyy") 
+                  {selectedPaymentForView.payment_date 
+                    ? format(new Date(selectedPaymentForView.payment_date), "MMM d, yyyy") 
                     : "-"
                   }
                 </div>
@@ -1206,7 +1185,7 @@ export default function Bookings() {
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Payment Method</div>
-                <div>{selectedPaymentForView.method || "-"}</div>
+                <div>{selectedPaymentForView.payment_method || "-"}</div>
               </div>
               <div className="sm:col-span-2">
                 <div className="text-xs text-muted-foreground mb-1">Payment Status</div>
@@ -1287,12 +1266,12 @@ export default function Bookings() {
                       ?.payments
                       ?.map(payment => (
                       <div key={payment.id} className="flex justify-between items-center p-2 bg-muted rounded-md">
-                        <div>{format(new Date(payment.date), "MMM d, yyyy")}</div>
+                        <div>{format(new Date(payment.payment_date), "MMM d, yyyy")}</div>
                         <div>₹{payment.amount.toLocaleString()}</div>
-                        <div className={`text-xs ${
-                          payment.status === "Completed" ? "text-emerald-500" :
-                          payment.status === "Pending" ? "text-yellow-500" :
-                          "text-red-500"
+                        <div className={`text-xs px-2 py-1 rounded-full ${
+                          payment.status === "Completed" ? "bg-emerald-100 text-emerald-500" :
+                          payment.status === "Pending" ? "bg-yellow-100 text-yellow-500" :
+                          "bg-red-100 text-red-500"
                         }`}>
                           {payment.status}
                         </div>

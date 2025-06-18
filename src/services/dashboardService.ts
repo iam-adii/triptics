@@ -369,354 +369,171 @@ export async function getMonthlyData() {
   }
 }
 
-// Get recent leads
-export async function getRecentLeads(limit = 3) {
+// Get recent leads (increase limit and fetch more data)
+export async function getRecentLeads(limit = 5) {
   try {
     const { data, error } = await supabase
       .from("leads")
-      .select("id, first_name, last_name, email, status, created_at")
+      .select("id, name, email, phone, status, created_at")
       .order("created_at", { ascending: false })
       .limit(limit);
     
     if (error) throw error;
     
-    if (data && data.length > 0) {
-      return data.map(lead => ({
-        id: lead.id,
-        name: `${lead.first_name} ${lead.last_name}`,
-        email: lead.email,
-        status: lead.status,
-        date: format(parseISO(lead.created_at), 'dd MMM, yyyy')
-      }));
-    }
-    
-    return [];
+    return (data || []).map(lead => ({
+      id: lead.id,
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      status: lead.status,
+      date: format(parseISO(lead.created_at), "dd MMM, yyyy")
+    }));
   } catch (error) {
     console.error("Error fetching recent leads:", error);
     return [];
   }
 }
 
-// Get top tours by bookings/revenue
-export async function getTopTours(limit = 3) {
+// Rename to getUpcomingTours and fetch upcoming tours instead of top tours
+export async function getUpcomingTours(limit = 5) {
   try {
-    // Get all tours
-    const { data: tours, error: toursError } = await supabase
-      .from("tours")
-      .select("id, name, duration");
+    const today = new Date().toISOString();
     
-    if (toursError) throw toursError;
-    
-    // Get all bookings
-    const { data: bookings, error: bookingsError } = await supabase
-      .from("bookings")
-      .select("tour_id, total_amount");
-    
-    if (bookingsError) throw bookingsError;
-    
-    // Calculate tour stats
-    const tourStats = tours.map(tour => {
-      const tourBookings = bookings.filter(booking => booking.tour_id === tour.id);
-      const revenue = tourBookings.reduce((sum, booking) => sum + (parseFloat(booking.total_amount) || 0), 0);
-      
-      return {
-        id: tour.id,
-        name: tour.name,
-        duration: `${tour.duration} days`,
-        bookings: tourBookings.length,
-        revenue
-      };
-    });
-    
-    // Sort by revenue and return top tours
-    return tourStats
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, limit);
-      
-  } catch (error) {
-    console.error("Error fetching top tours:", error);
-    return mockDashboardData.topTours;
-  }
-}
-
-// Get upcoming bookings
-export async function getUpcomingBookings(limit = 3) {
-  try {
-    // Get latest bookings regardless of date
-    const { data: bookingsData, error: bookingsError } = await supabase
-      .from("bookings")
-      .select("id, tour_id, customer_id, status, created_at, start_date")
-      .order("created_at", { ascending: false })
+    // Get upcoming tours from itineraries that have a start date in the future
+    const { data, error } = await supabase
+      .from("itineraries")
+      .select(`
+        id, 
+        name, 
+        start_date, 
+        end_date, 
+        bookings:bookings(count),
+        destination
+      `)
+      .gt("start_date", today)
+      .order("start_date", { ascending: true })
       .limit(limit);
     
-    if (bookingsError) throw bookingsError;
+    if (error) throw error;
     
-    if (!bookingsData || bookingsData.length === 0) {
-      return [];
-    }
-    
-    // Get tours data
-    const tourIds = [...new Set(bookingsData.map(booking => booking.tour_id))];
-    const { data: toursData, error: toursError } = await supabase
-      .from("tours")
-      .select("id, name")
-      .in("id", tourIds);
-    
-    if (toursError) throw toursError;
-    
-    // Get customers data
-    const customerIds = [...new Set(bookingsData.map(booking => booking.customer_id))];
-    const { data: customersData, error: customersError } = await supabase
-      .from("customers")
-      .select("id, first_name, last_name")
-      .in("id", customerIds);
-    
-    if (customersError) throw customersError;
-    
-    // Map tours and customers to bookings
-    return bookingsData.map(booking => {
-      const tour = toursData.find(t => t.id === booking.tour_id) || { name: "Unknown Tour" };
-      const customer = customersData.find(c => c.id === booking.customer_id) || { first_name: "Unknown", last_name: "Customer" };
-      
-      return {
-        id: booking.id,
-        tourName: tour.name,
-        customerName: `${customer.first_name} ${customer.last_name}`,
-        status: booking.status,
-        date: format(parseISO(booking.created_at), 'dd MMM, yyyy')
-      };
-    });
+    return (data || []).map(tour => ({
+      id: tour.id,
+      name: tour.name,
+      destination: tour.destination,
+      startDate: format(parseISO(tour.start_date), "dd MMM, yyyy"),
+      endDate: tour.end_date ? format(parseISO(tour.end_date), "dd MMM, yyyy") : null,
+      duration: calculateDuration(tour.start_date, tour.end_date),
+      bookings: tour.bookings[0]?.count || 0
+    }));
   } catch (error) {
-    console.error("Error fetching latest bookings:", error);
+    console.error("Error fetching upcoming tours:", error);
     return [];
   }
 }
 
-// Get dashboard data - optimized version with batched queries
+// Helper function to calculate tour duration
+function calculateDuration(startDate: string, endDate: string | null) {
+  if (!startDate || !endDate) return "N/A";
+  
+  const start = parseISO(startDate);
+  const end = parseISO(endDate);
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return `${diffDays} days`;
+}
+
+// Get upcoming bookings with more detail
+export async function getUpcomingBookings(limit = 5) {
+  try {
+    const today = new Date().toISOString();
+    
+    // Get upcoming bookings with customer and tour details
+    const { data, error } = await supabase
+      .from("bookings")
+      .select(`
+        id, 
+        status, 
+        created_at,
+        total_amount,
+        tour_date,
+        customers:customer_id(id, name, email, phone),
+        itineraries:itinerary_id(id, name)
+      `)
+      .gt("tour_date", today)
+      .order("tour_date", { ascending: true })
+      .limit(limit);
+    
+    if (error) throw error;
+    
+    return (data || []).map(booking => ({
+      id: booking.id,
+      tourName: booking.itineraries?.name || "Unknown Tour",
+      customerName: booking.customers?.name || "Unknown Customer",
+      customerEmail: booking.customers?.email || "",
+      customerPhone: booking.customers?.phone || "",
+      status: booking.status,
+      amount: booking.total_amount,
+      date: booking.tour_date ? format(parseISO(booking.tour_date), "dd MMM, yyyy") : format(parseISO(booking.created_at), "dd MMM, yyyy")
+    }));
+  } catch (error) {
+    console.error("Error fetching upcoming bookings:", error);
+    return [];
+  }
+}
+
+// Update the main getDashboardData function to use the new functions
 export async function getDashboardData() {
   try {
-    // Current date and time range calculations
-    const today = new Date();
-    const currentMonthStart = startOfMonth(today);
-    const previousMonthStart = startOfMonth(subMonths(today, 1));
-    const previousMonthEnd = endOfMonth(previousMonthStart);
-    
-    // Parallel fetch for all necessary data
+    // Fetch all data in parallel for better performance
     const [
-      leadsData,
-      bookingsData,
-      monthlyData,
-      toursData
-    ] = await Promise.all([
-      // 1. Fetch all leads with minimal fields for stats
-      supabase
-        .from("leads")
-        .select("id, first_name, last_name, email, status, created_at"),
-      
-      // 2. Fetch all bookings with minimal fields for stats
-      supabase
-        .from("bookings")
-        .select("id, tour_id, customer_id, status, total_amount, created_at, start_date")
-        .order("created_at", { ascending: false }),
-      
-      // 3. Get monthly data
-      getMonthlyData(),
-      
-      // 4. Fetch tours data for stats
-      supabase
-        .from("tours")
-        .select("id, name, duration")
-    ]);
-    
-    // Handle errors
-    if (leadsData.error) throw leadsData.error;
-    if (bookingsData.error) throw bookingsData.error;
-    if (toursData.error) throw toursData.error;
-    
-    // Get customers data for bookings
-    const customerIds = [...new Set(bookingsData.data.map(booking => booking.customer_id).filter(Boolean))];
-    const customersData = customerIds.length > 0 ? 
-      await supabase
-        .from("customers")
-        .select("id, first_name, last_name")
-        .in("id", customerIds) : 
-      { data: [] };
-    
-    if (customersData.error) throw customersData.error;
-    
-    // Process all data
-    
-    // 1. Process leads data
-    const allLeads = leadsData.data || [];
-    const totalLeads = allLeads.length;
-    
-    const currentMonthLeads = allLeads.filter(lead => 
-      new Date(lead.created_at) >= currentMonthStart && 
-      new Date(lead.created_at) <= today
-    );
-    
-    const previousMonthLeads = allLeads.filter(lead => 
-      new Date(lead.created_at) >= previousMonthStart && 
-      new Date(lead.created_at) <= previousMonthEnd
-    );
-    
-    const currentLeadsCount = currentMonthLeads.length;
-    const previousLeadsCount = previousMonthLeads.length;
-    
-    let leadsGrowth = 0;
-    if (previousLeadsCount > 0) {
-      leadsGrowth = Math.round(((currentLeadsCount - previousLeadsCount) / previousLeadsCount) * 100);
-    } else if (currentLeadsCount > 0) {
-      leadsGrowth = 100;
-    }
-    
-    // 2. Process bookings data
-    const allBookings = bookingsData.data || [];
-    const totalBookings = allBookings.length;
-    
-    const currentMonthBookings = allBookings.filter(booking => 
-      new Date(booking.created_at) >= currentMonthStart && 
-      new Date(booking.created_at) <= today
-    );
-    
-    const previousMonthBookings = allBookings.filter(booking => 
-      new Date(booking.created_at) >= previousMonthStart && 
-      new Date(booking.created_at) <= previousMonthEnd
-    );
-    
-    const currentBookingsCount = currentMonthBookings.length;
-    const previousBookingsCount = previousMonthBookings.length;
-    
-    let bookingsGrowth = 0;
-    if (previousBookingsCount > 0) {
-      bookingsGrowth = Math.round(((currentBookingsCount - previousBookingsCount) / previousBookingsCount) * 100);
-    } else if (currentBookingsCount > 0) {
-      bookingsGrowth = 100;
-    }
-    
-    // 3. Process revenue data
-    const totalRevenue = allBookings.reduce((sum, booking) => sum + (parseFloat(booking.total_amount) || 0), 0);
-    
-    const currentMonthRevenue = currentMonthBookings.reduce(
-      (sum, booking) => sum + (parseFloat(booking.total_amount) || 0), 0
-    );
-    
-    const previousMonthRevenue = previousMonthBookings.reduce(
-      (sum, booking) => sum + (parseFloat(booking.total_amount) || 0), 0
-    );
-    
-    let revenueGrowth = 0;
-    if (previousMonthRevenue > 0) {
-      revenueGrowth = Math.round(((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100);
-    } else if (currentMonthRevenue > 0) {
-      revenueGrowth = 100;
-    }
-    
-    // 4. Process conversion data
-    const conversionRate = totalLeads ? Math.round((totalBookings / totalLeads) * 100) : 0;
-    
-    const currentConversionRate = currentLeadsCount 
-      ? Math.round((currentBookingsCount / currentLeadsCount) * 100) 
-      : 0;
-    
-    const previousConversionRate = previousLeadsCount 
-      ? Math.round((previousBookingsCount / previousLeadsCount) * 100) 
-      : 0;
-    
-    let conversionGrowth = 0;
-    if (previousConversionRate > 0) {
-      conversionGrowth = Math.round(((currentConversionRate - previousConversionRate) / previousConversionRate) * 100);
-    } else if (currentConversionRate > 0) {
-      conversionGrowth = 100;
-    }
-    
-    // 5. Process recent leads
-    const recentLeads = allLeads
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 3)
-      .map(lead => ({
-        id: lead.id,
-        name: `${lead.first_name} ${lead.last_name}`,
-        email: lead.email,
-        status: lead.status,
-        date: format(parseISO(lead.created_at), 'dd MMM, yyyy')
-      }));
-    
-    // 6. Process top tours
-    const tours = toursData.data || [];
-    const tourStats = tours.map(tour => {
-      const tourBookings = allBookings.filter(booking => booking.tour_id === tour.id);
-      const revenue = tourBookings.reduce((sum, booking) => sum + (parseFloat(booking.total_amount) || 0), 0);
-      
-      return {
-        id: tour.id,
-        name: tour.name,
-        duration: `${tour.duration} days`,
-        bookings: tourBookings.length,
-        revenue
-      };
-    });
-    
-    const topTours = tourStats
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 3);
-    
-    // 7. Process upcoming bookings
-    const customers = customersData.data || [];
-    const upcomingBookings = allBookings
-      .slice(0, 3)
-      .map(booking => {
-        const tour = tours.find(t => t.id === booking.tour_id) || { name: "Unknown Tour" };
-        const customer = customers.find(c => c.id === booking.customer_id) || { first_name: "Unknown", last_name: "Customer" };
-        
-        return {
-          id: booking.id,
-          tourName: tour.name,
-          customerName: `${customer.first_name} ${customer.last_name}`,
-          status: booking.status,
-          date: format(parseISO(booking.created_at), 'dd MMM, yyyy')
-        };
-      });
-    
-    // Return aggregated dashboard data
-    return {
       totalLeads,
-      leadsGrowth: { 
-        growth: leadsGrowth, 
-        current: currentLeadsCount, 
-        previous: previousLeadsCount 
-      },
+      leadsGrowth,
       totalBookings,
-      bookingsGrowth: { 
-        growth: bookingsGrowth, 
-        current: currentBookingsCount, 
-        previous: previousBookingsCount 
-      },
+      bookingsGrowth,
       totalRevenue,
-      revenueGrowth: { 
-        growth: revenueGrowth, 
-        current: currentMonthRevenue, 
-        previous: previousMonthRevenue 
-      },
+      revenueGrowth,
       conversionRate,
-      conversionGrowth: { 
-        growth: conversionGrowth, 
-        current: currentConversionRate, 
-        previous: previousConversionRate 
-      },
+      conversionGrowth,
       monthlyData,
       recentLeads,
-      topTours,
+      upcomingTours,
+      upcomingBookings
+    ] = await Promise.all([
+      getTotalLeads(),
+      getLeadsGrowth(),
+      getTotalBookings(),
+      getBookingsGrowth(),
+      getTotalRevenue(),
+      getRevenueGrowth(),
+      getConversionRate(),
+      getConversionGrowth(),
+      getMonthlyData(),
+      getRecentLeads(5),
+      getUpcomingTours(5),
+      getUpcomingBookings(5)
+    ]);
+    
+    return {
+      totalLeads,
+      leadsGrowth,
+      totalBookings,
+      bookingsGrowth,
+      totalRevenue,
+      revenueGrowth,
+      conversionRate,
+      conversionGrowth,
+      monthlyData,
+      recentLeads,
+      upcomingTours, // Changed from topTours
       upcomingBookings
     };
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
-    // Return mock data as fallback only if everything fails
+    // Return mock data as fallback
     return {
       ...mockDashboardData,
-      recentLeads: await getRecentLeads().catch(() => []),
-      topTours: await getTopTours().catch(() => mockDashboardData.topTours),
-      upcomingBookings: await getUpcomingBookings().catch(() => [])
+      upcomingTours: mockDashboardData.topTours // Map old property to new one
     };
   }
 } 

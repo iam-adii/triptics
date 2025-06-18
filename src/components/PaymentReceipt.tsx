@@ -279,8 +279,8 @@ interface PaymentReceiptProps {
     payment_id: string;
     amount: number;
     status: string;
-    method: string;
-    date: string;
+    payment_method: string;
+    payment_date: string;
     payment_type?: string;
     notes?: string;
     bookings?: Booking | null;
@@ -357,7 +357,7 @@ const PaymentReceipt: React.FC<PaymentReceiptProps> = ({ payment, showPaid = tru
           <View style={styles.receiptDetails}>
             <Text style={styles.receiptTitle}>PAYMENT RECEIPT</Text>
             <Text style={styles.receiptNumber}>Receipt No: {payment.payment_id}</Text>
-            <Text style={styles.receiptDate}>Date: {formatDate(payment.date)}</Text>
+            <Text style={styles.receiptDate}>Date: {formatDate(payment.payment_date)}</Text>
           </View>
         </View>
 
@@ -379,7 +379,7 @@ const PaymentReceipt: React.FC<PaymentReceiptProps> = ({ payment, showPaid = tru
           
           <View style={styles.paymentDetailRow}>
             <Text style={styles.paymentLabel}>Payment Method:</Text>
-            <Text style={styles.paymentValue}>{payment.method}</Text>
+            <Text style={styles.paymentValue}>{payment.payment_method}</Text>
           </View>
           
           <View style={styles.paymentDetailRow}>
@@ -394,7 +394,7 @@ const PaymentReceipt: React.FC<PaymentReceiptProps> = ({ payment, showPaid = tru
           
           <View style={styles.paymentDetailRow}>
             <Text style={styles.paymentLabel}>Payment Date:</Text>
-            <Text style={styles.paymentValue}>{formatDate(payment.date)}</Text>
+            <Text style={styles.paymentValue}>{formatDate(payment.payment_date)}</Text>
           </View>
           
           {payment.bookings?.id && (

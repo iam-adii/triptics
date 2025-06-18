@@ -93,7 +93,7 @@ export function useItineraryManagement() {
   };
 
   const handleShareViaWhatsApp = (itinerary: Itinerary) => {
-    const message = `Check out this travel itinerary: ${itinerary.name} - ${itinerary.destination || ''}`;
+    const message = `Check out this travel itinerary: ${itinerary.title} - ${itinerary.destination || ''}`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
   };
@@ -105,19 +105,25 @@ export function useItineraryManagement() {
 
   // Filter itineraries based on search term, status, and date
   const filteredItineraries = itineraries.filter((itinerary) => {
+    // Safely handle potentially undefined properties
+    const title = itinerary.title || '';
+    const destination = itinerary.destination || '';
+    const customerName = itinerary.customers?.name || '';
+    const status = itinerary.status || '';
+    
     const matchesSearch = 
-      itinerary.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (itinerary.destination && itinerary.destination.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (itinerary.customers?.name && itinerary.customers.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customerName.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = 
       statusFilter === "all" || 
-      itinerary.status.toLowerCase() === statusFilter.toLowerCase();
+      status.toLowerCase() === statusFilter.toLowerCase();
 
     // Filter by destination if selected
     const matchesDestination =
       destination === "all" ||
-      (itinerary.destination && itinerary.destination.toLowerCase() === destination.toLowerCase());
+      destination.toLowerCase() === destination.toLowerCase();
 
     // Date filtering
     let matchesDate = true;
@@ -146,8 +152,8 @@ export function useItineraryManagement() {
   // Helper to get filtered itineraries by tab
   const getTabFilteredItineraries = (tabValue: string) => {
     if (tabValue === 'all') return filteredItineraries;
-    if (tabValue === 'drafts') return filteredItineraries.filter(i => i.status.toLowerCase() === 'draft');
-    if (tabValue === 'published') return filteredItineraries.filter(i => i.status.toLowerCase() === 'published');
+    if (tabValue === 'drafts') return filteredItineraries.filter(i => (i.status || '').toLowerCase() === 'draft');
+    if (tabValue === 'published') return filteredItineraries.filter(i => (i.status || '').toLowerCase() === 'published');
     if (tabValue === 'templates') return []; // Adjust if you have template logic
     return filteredItineraries;
   };

@@ -5,6 +5,8 @@ import { File, Mail } from 'lucide-react';
 import BookingItinerary from './BookingItinerary';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/contexts/CompanySettingsContext';
+import { getCompanySettings } from '@/utils/pdf';
+import { EMAIL_ENDPOINTS } from '@/config/email';
 
 interface Customer {
   name: string;
@@ -12,11 +14,11 @@ interface Customer {
   phone?: string;
 }
 
-interface Tour {
+interface Itinerary {
   name: string;
   description?: string;
-  days?: number;
-  location?: string;
+  duration?: number;
+  destination?: string;
 }
 
 interface ItineraryItem {
@@ -29,7 +31,7 @@ interface Booking {
   id: string;
   booking_number?: string;
   customers?: Customer | null;
-  tours?: Tour | null;
+  itineraries?: Itinerary | null;
   total_amount: number;
   status: string;
   start_date?: string | null;
@@ -56,27 +58,10 @@ interface ItineraryPDFProps {
   showIcon?: boolean;
 }
 
-// A function to fetch company settings outside of React component
-const fetchCompanySettings = async (): Promise<CompanySettings | null> => {
-  try {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { data, error } = await supabase
-      .from('company_settings')
-      .select('*')
-      .single();
-    
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error fetching company settings:', error);
-    return null;
-  }
-};
-
 // A standalone function to share the itinerary via email
 export function shareItineraryViaEmail(booking: Booking, recipientEmail?: string) {
   // Get company settings
-  return fetchCompanySettings().then(async companySettings => {
+  return getCompanySettings().then(async companySettings => {
     try {
       const recipient = recipientEmail || booking.customers?.email;
       
@@ -97,7 +82,7 @@ export function shareItineraryViaEmail(booking: Booking, recipientEmail?: string
         const arrayBuffer = await pdfBlob.arrayBuffer();
         
         // Import email service dynamically
-        const { sendBookingConfirmation, checkEmailServer } = await import('@/services/emailService');
+        const { callEmailApi, checkEmailServer } = await import('@/services/emailService');
         
         // Check if email server is running
         const isServerRunning = await checkEmailServer();
@@ -110,40 +95,37 @@ export function shareItineraryViaEmail(booking: Booking, recipientEmail?: string
         const bookingDetails = {
           bookingId: booking.booking_number || `BOOK${booking.id.slice(-6).toUpperCase()}`,
           bookingDate: new Date(booking.created_at || new Date()).toLocaleDateString(),
-          tourName: booking.tours?.name || 'Tour Package',
+          itineraryName: booking.itineraries?.name || 'Itinerary Package',
           customerName: booking.customers?.name || 'Guest'
         };
         
         // Send email with PDF attachment
-        const result = await sendBookingConfirmation(
-          recipient, 
-          bookingDetails, 
-          new Uint8Array(arrayBuffer)
-        );
+        const result = await callEmailApi(EMAIL_ENDPOINTS.itinerary, {
+          name: bookingDetails.customerName,
+          email: recipient, 
+          message: `Itinerary details for ${bookingDetails.itineraryName}`,
+          type: 'itinerary',
+          itineraryDetails: bookingDetails,
+          pdfBuffer: Array.from(new Uint8Array(arrayBuffer))
+        });
         
         // Dismiss loading toast
         toast.dismiss(loadingToast);
         
+        // Show success message
         if (result.success) {
-          toast.success(`Booking confirmation sent to ${recipient}`);
+          toast.success(`Itinerary sent to ${recipient}`);
         } else {
-          toast.error(`Failed to send booking confirmation: ${result.error}`);
+          toast.error(`Failed to send email: ${result.error}`);
         }
-      } catch (error: any) {
+      } catch (error) {
         toast.dismiss(loadingToast);
-        
-        if (error.message && error.message.includes('Email server is not running')) {
-          toast.error('Email server is not running. Please start the server by running "npm run dev" in the server directory.');
-        } else if (error.message && error.message.includes('Email settings not configured')) {
-          toast.error('Email settings not configured. Please configure your SMTP settings in the Settings page.');
-        } else {
-          toast.error('Failed to send booking confirmation: ' + (error.message || 'Unknown error'));
-        }
-        console.error('Error processing booking confirmation email:', error);
+        toast.error('Failed to send email');
+        console.error('Error sending email:', error);
       }
-    } catch (error: any) {
-      console.error('Error processing booking confirmation email:', error);
-      toast.error('Failed to send booking confirmation email: ' + (error.message || 'Unknown error'));
+    } catch (error) {
+      console.error('Error sharing itinerary via email:', error);
+      toast.error('Failed to share itinerary');
     }
   });
 }

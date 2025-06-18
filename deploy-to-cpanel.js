@@ -12,9 +12,44 @@ const __dirname = dirname(__filename);
 console.log('Building the application...');
 execSync('npm run build', { stdio: 'inherit' });
 
+// Create API directory if it doesn't exist
+console.log('Setting up API directory...');
+if (!fs.existsSync(path.join('dist', 'api'))) {
+    fs.mkdirSync(path.join('dist', 'api'), { recursive: true });
+}
+
+// Copy API files to dist folder
+if (fs.existsSync('api')) {
+    console.log('Copying API files to dist folder...');
+    const copyDir = (src, dest) => {
+        if (!fs.existsSync(dest)) {
+            fs.mkdirSync(dest, { recursive: true });
+        }
+        
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+        
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name);
+            const destPath = path.join(dest, entry.name);
+            
+            if (entry.isDirectory()) {
+                copyDir(srcPath, destPath);
+            } else {
+                fs.copyFileSync(srcPath, destPath);
+            }
+        }
+    };
+    
+    copyDir('api', path.join('dist', 'api'));
+}
+
 // Copy .htaccess to dist folder
 console.log('Copying .htaccess to dist folder...');
 fs.copyFileSync('.htaccess', path.join('dist', '.htaccess'));
+
+// Copy deployment guides to dist folder
+console.log('Copying deployment guides to dist folder...');
+fs.copyFileSync('CPANEL_DEPLOYMENT.md', path.join('dist', 'CPANEL_DEPLOYMENT.md'));
 
 // Create a simple PHP test file to check server configuration
 const phpTestContent = `<?php
@@ -39,6 +74,7 @@ For troubleshooting:
 - Check browser console for errors
 - Verify .htaccess is uploaded and not blocked
 - Ensure all files have proper permissions (644 for files, 755 for directories)
+- See CPANEL_DEPLOYMENT.md for detailed instructions
 `;
 
 fs.writeFileSync(path.join('dist', 'deployment-info.txt'), infoContent);

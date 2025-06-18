@@ -11,6 +11,7 @@ import { PDFDownloadLink, BlobProvider } from "@react-pdf/renderer";
 import ItineraryPDF from "@/components/itinerary/ItineraryPDF";
 import { useCompanySettings } from "@/contexts/CompanySettingsContext";
 import SendItineraryEmailButton from "@/components/itinerary/SendItineraryEmailButton";
+import ShareViaWhatsAppButton from "@/components/itinerary/ShareViaWhatsAppButton";
 
 // Import WhatsApp icon
 const WhatsAppIcon = () => (
@@ -35,12 +36,20 @@ export default function ItineraryBuilderPage() {
   // Add company settings hook
   const { companySettings } = useCompanySettings();
   
+  // Add state for pricing options
+  const [pricingOptions, setPricingOptions] = useState({
+    taxPercentage: 0,
+    agentCharges: 0,
+    additionalServices: [],
+    showPerPersonPrice: false
+  });
+  
   // Cab type options
   const cabTypes = [
-    { value: "sedan", label: "Sedan" },
-    { value: "suv", label: "SUV" },
-    { value: "luxury", label: "Luxury Car" },
-    { value: "minivan", label: "Minivan" },
+    { value: "WagonR/Hatchback", label: "WagonR/Hatchback" },
+    { value: "Innova/Xylo", label: "Innova/Xylo" },
+    { value: "Innova Crysta", label: "Innova Crysta" },
+    { value: "Sumo/Bolero", label: "Sumo/Bolero" },
     { value: "tempo", label: "Tempo Traveller" },
     { value: "bus", label: "Bus" },
     { value: "train", label: "Train" },
@@ -65,7 +74,7 @@ export default function ItineraryBuilderPage() {
       
       const { data, error } = await supabase
         .from("itineraries")
-        .select("*, customers(*)")
+        .select("*, customers(*), customer_email, customer_phone")
         .eq("id", id)
         .single();
       
@@ -86,7 +95,7 @@ export default function ItineraryBuilderPage() {
       
       const { data, error } = await supabase
         .from("itinerary_days")
-        .select("*, hotel:hotel_id(*)")
+        .select("*, hotel:hotel_id(*), route_name, route_description, cab_type, cab_price")
         .eq("itinerary_id", id)
         .order("day_number");
       
@@ -116,6 +125,28 @@ export default function ItineraryBuilderPage() {
     },
     enabled: !!id
   });
+
+  // Fetch pricing options from local storage or database
+  useEffect(() => {
+    if (id) {
+      // Try to load from local storage first
+      const savedOptions = localStorage.getItem(`pricing_options_${id}`);
+      if (savedOptions) {
+        try {
+          setPricingOptions(JSON.parse(savedOptions));
+        } catch (e) {
+          console.error("Error parsing saved pricing options:", e);
+        }
+      }
+    }
+  }, [id]);
+
+  // Save pricing options to local storage when they change
+  useEffect(() => {
+    if (id && Object.keys(pricingOptions).length > 0) {
+      localStorage.setItem(`pricing_options_${id}`, JSON.stringify(pricingOptions));
+    }
+  }, [id, pricingOptions]);
 
   // Handle save and return to itineraries page
   const handleSaveAndExit = async () => {
@@ -199,11 +230,42 @@ export default function ItineraryBuilderPage() {
         message += `\n📍 ${day.hotel.city}, ${day.hotel.state}, ${day.hotel.country}\n\n`;
       }
       
-      // Add cab type information if available
-      if (day.cab_type) {
-        const cabTypeObj = cabTypes.find(c => c.value === day.cab_type);
-        const cabTypeName = cabTypeObj ? cabTypeObj.label : day.cab_type;
-        message += `🚗 *Transport Type:* ${cabTypeName}\n\n`;
+      // Add route information if available - Updated to focus on route name
+      if (day.route_name) {
+        message += `🚗 *Route:* ${day.route_name}\n`;
+        if (day.route_description) {
+          message += `${day.route_description}\n`;
+        }
+        if (day.cab_type) {
+          message += `🚕 Transport: ${day.cab_type}`;
+          
+          // Add cab quantity if more than 1
+          if (day.cab_quantity && day.cab_quantity > 1) {
+            message += ` x${day.cab_quantity}`;
+          }
+          
+          if (day.cab_price) {
+            message += ` (₹${day.cab_price.toFixed(2)})`;
+          }
+          message += `\n\n`;
+        } else {
+          message += `\n\n`;
+        }
+      } else if (day.cab_type) {
+        // Fallback to cab type if no route name
+        message += `🚕 *Transport Type:* ${day.cab_type}`;
+        
+        // Add cab quantity if more than 1
+        if (day.cab_quantity && day.cab_quantity > 1) {
+          message += ` x${day.cab_quantity}`;
+        }
+        
+        // Add price if available
+        if (day.cab_price) {
+          message += ` (₹${day.cab_price.toFixed(2)})`;
+        }
+        
+        message += `\n\n`;
       }
       
       if (dayActivities.length === 0) {
@@ -241,8 +303,36 @@ export default function ItineraryBuilderPage() {
     // Add footer
     message += `\n*Shared via Triptics Itinerary Builder*`;
     
+    // Get customer phone number if available
+    const phoneNumber = itinerary.customer_phone || itinerary.customers?.phone;
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+    
+    // If we have a phone number, use it; otherwise open WhatsApp without a specific recipient
+    if (phoneNumber) {
+      // Format phone number to ensure it has country code (assuming +91 for India if not provided)
+      let formattedNumber = phoneNumber.trim();
+      
+      // If the number doesn't start with +, add the country code
+      if (!formattedNumber.startsWith('+')) {
+        // Remove any leading zeros
+        formattedNumber = formattedNumber.replace(/^0+/, '');
+        
+        // If it doesn't start with a country code (like 91), add it
+        if (!formattedNumber.startsWith('91')) {
+          formattedNumber = '91' + formattedNumber;
+        }
+        
+        // Add the + prefix
+        formattedNumber = '+' + formattedNumber;
+      }
+      
+      // Remove any spaces, dashes, or parentheses
+      formattedNumber = formattedNumber.replace(/[\s\-()]/g, '');
+      
+      window.open(`https://wa.me/${formattedNumber}?text=${encodedMessage}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
+    }
   };
 
   // Handle back button click
@@ -329,6 +419,7 @@ export default function ItineraryBuilderPage() {
                   days={days} 
                   activities={activities} 
                   companySettings={companySettings}
+                  pricingOptions={pricingOptions}
                 />
               }
             >
@@ -377,19 +468,22 @@ export default function ItineraryBuilderPage() {
                     buttonText="Send via Email"
                     className="border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 w-full sm:w-auto h-10 sm:h-9 flex-1 sm:flex-initial"
                     pdfBlob={blob}
+                    pricingOptions={pricingOptions}
                   />
                 </>
               )}
             </BlobProvider>
             
-            <Button 
-              size="sm" 
-              onClick={handleShareViaWhatsApp}
+            <ShareViaWhatsAppButton
+              itinerary={itinerary}
+              days={days}
+              activities={activities}
+              size="sm"
+              variant="default"
+              buttonText="Share"
               className="bg-emerald-500 hover:bg-emerald-600 text-white flex-1 sm:flex-initial h-10 sm:h-9"
-            >
-              <WhatsAppIcon />
-              <span className="hidden sm:inline ml-2">Share</span>
-            </Button>
+              pricingOptions={pricingOptions}
+            />
           </div>
         </div>
       </div>
@@ -410,6 +504,8 @@ export default function ItineraryBuilderPage() {
               queryClient.invalidateQueries({ queryKey: ["itineraryActivities", id] });
             }}
             isStandalone={true}
+            pricingOptions={pricingOptions}
+            onPricingOptionsChange={setPricingOptions}
           />
         </TabsContent>
         
@@ -434,6 +530,42 @@ export default function ItineraryBuilderPage() {
                       </div>
                     )}
                     
+                    {/* Display route information - Updated to include description */}
+                    {day.route_name && (
+                      <div className="mt-2 p-2 bg-white border rounded-md">
+                        <div className="flex items-center gap-1">
+                          <Car className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium text-gray-800">Route: {day.route_name}</span>
+                        </div>
+                        {day.route_description && (
+                          <div className="ml-6 text-xs text-gray-700 mt-1">
+                            {day.route_description}
+                          </div>
+                        )}
+                        {day.cab_type ? (
+                          <div className="mt-2 text-xs flex items-center">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                              {day.cab_type}
+                              {day.cab_quantity > 1 && (
+                                <span className="ml-1">
+                                  x{day.cab_quantity}
+                                </span>
+                              )}
+                              {day.cab_price && (
+                                <span className="ml-1 font-medium">
+                                  ₹{day.cab_price.toFixed(2)}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="ml-6 text-xs text-muted-foreground mt-1">
+                            No transport type selected
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     {/* Display hotel information */}
                     {day.hotel && (
                       <div className="mt-2 p-2 bg-white border rounded-md">
@@ -441,55 +573,54 @@ export default function ItineraryBuilderPage() {
                           <Building2 className="h-4 w-4 text-emerald-600" />
                           <span className="font-medium text-gray-800">{day.hotel.name}</span>
                         </div>
-                        <div className="ml-6 text-xs text-muted-foreground mt-1">
-                          {day.hotel.city}, {day.hotel.state}
-                          <span className="flex items-center mt-1">
+                        <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                          <span>{day.hotel.city}, {day.hotel.state}</span>
+                          <span className="flex items-center ml-2">
                             {Array(day.hotel.star_category).fill(0).map((_, i) => (
                               <Star key={i} className="h-3 w-3 text-amber-400 fill-amber-400" />
                             ))}
                           </span>
                         </div>
+                        {(day.room_type || day.meal_plan || day.room_price) && (
+                          <div className="ml-6 mt-2 pt-1 border-t border-gray-100">
+                            {day.room_type && (
+                              <div className="text-xs text-gray-700">
+                                <span className="font-medium">Room:</span> {day.room_type}
+                                {day.room_quantity > 1 && (
+                                  <span className="ml-1">
+                                    x{day.room_quantity}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {day.meal_plan && (
+                              <div className="text-xs text-gray-700">
+                                <span className="font-medium">Meal Plan:</span> {day.meal_plan === "CP" ? "CP (Room Only)" : 
+                                                                                day.meal_plan === "MAP" ? "MAP (Breakfast + Dinner)" :
+                                                                                day.meal_plan === "AP" ? "AP (All Meals)" :
+                                                                                day.meal_plan === "EP" ? "EP (Breakfast Only)" : 
+                                                                                day.meal_plan}
+                              </div>
+                            )}
+                            {day.room_price && (
+                              <div className="text-xs font-medium text-emerald-600">
+                                Price: ₹{day.room_price.toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     
-                    {/* Display cab type information */}
-                    {day.cab_type && (
+                    {/* Display day notes */}
+                    {day.notes && (
                       <div className="mt-2 p-2 bg-white border rounded-md">
-                        <div className="flex items-center gap-1">
-                          <Car className="h-4 w-4 text-blue-600" />
-                          <span className="font-medium text-gray-800">
-                            {getCabTypeLabel(day.cab_type)}
-                          </span>
+                        <div className="text-sm font-medium mb-1">Notes:</div>
+                        <div className="text-sm text-gray-700 whitespace-pre-line">
+                          {day.notes}
                         </div>
                       </div>
                     )}
-                    
-                    <div className="space-y-2 pt-2">
-                      {dayActivities.length === 0 ? (
-                        <div className="text-sm text-muted-foreground italic">No activities added</div>
-                      ) : (
-                        dayActivities.map((activity) => (
-                          <div key={activity.id} className="text-sm">
-                            <div className="font-medium">{activity.title}</div>
-                            {activity.time_start && (
-                              <div className="text-xs text-muted-foreground">
-                                {new Date(`2000-01-01T${activity.time_start}`).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                                {activity.time_end && ` - ${new Date(`2000-01-01T${activity.time_end}`).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}`}
-                              </div>
-                            )}
-                            {activity.is_transfer && (
-                              <div className="text-xs bg-emerald-100 text-emerald-700 w-fit px-2 py-0.5 rounded-sm mt-1">Transfer</div>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
                   </div>
                 );
               })}
@@ -541,6 +672,40 @@ export default function ItineraryBuilderPage() {
                       )}
                     </div>
                     
+                    {/* Display route information - Updated to include description */}
+                    {day.route_name && (
+                      <div className="bg-white border p-3 rounded-md mb-4">
+                        <div className="flex items-center gap-2">
+                          <Car className="h-4 w-4 text-blue-600" />
+                          <h4 className="font-medium text-gray-800">Route: {day.route_name}</h4>
+                        </div>
+                        {day.route_description && (
+                          <div className="ml-6 mt-1">
+                            <p className="text-sm text-gray-700">{day.route_description}</p>
+                          </div>
+                        )}
+                        {day.cab_type ? (
+                          <div className="mt-2 text-xs flex items-center">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                              {day.cab_type}
+                              {day.cab_quantity > 1 && (
+                                <span className="ml-1">
+                                  x{day.cab_quantity}
+                                </span>
+                              )}
+                              {/* Cab prices are hidden in preview tab */}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="ml-6 mt-1">
+                            <p className="text-sm text-muted-foreground">
+                              No transport type selected
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     {/* Display hotel information */}
                     {day.hotel && (
                       <div className="bg-white border p-3 rounded-md mb-4">
@@ -557,54 +722,144 @@ export default function ItineraryBuilderPage() {
                             ))}
                           </div>
                         </div>
-                      </div>
-                    )}
-                    
-                    {/* Display cab type information */}
-                    {day.cab_type && (
-                      <div className="mt-2 p-2 bg-white border rounded-md">
-                        <div className="flex items-center gap-1">
-                          <Car className="h-4 w-4 text-blue-600" />
-                          <span className="font-medium text-gray-800">
-                            {getCabTypeLabel(day.cab_type)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="space-y-4 pl-2 sm:pl-4">
-                      {dayActivities.length === 0 ? (
-                        <div className="text-sm text-muted-foreground italic">No activities planned for this day</div>
-                      ) : (
-                        dayActivities.map((activity) => (
-                          <div key={activity.id} className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              {activity.time_start && (
-                                <span className="text-sm font-medium">
-                                  {new Date(`2000-01-01T${activity.time_start}`).toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </span>
-                              )}
-                              <h4 className="font-medium">{activity.title}</h4>
-                              {activity.is_transfer && (
-                                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-sm">Transfer</span>
-                              )}
-                            </div>
-                            {activity.location && (
-                              <p className="text-sm text-muted-foreground pl-2 sm:pl-4">Location: {activity.location}</p>
+                        {(day.room_type || day.meal_plan || day.room_price) && (
+                          <div className="ml-6 mt-3 pt-2 border-t">
+                            {day.room_type && (
+                              <p className="text-sm text-gray-700">
+                                <span className="font-medium">Room:</span> {day.room_type}
+                                {day.room_quantity > 1 && (
+                                  <span className="ml-1">
+                                    x{day.room_quantity}
+                                  </span>
+                                )}
+                              </p>
                             )}
-                            {activity.description && (
-                              <p className="text-sm pl-2 sm:pl-4">{activity.description}</p>
+                            {day.meal_plan && (
+                              <p className="text-sm text-gray-700">
+                                <span className="font-medium">Meal Plan:</span> {day.meal_plan === "CP" ? "CP (Room Only)" : 
+                                                                                day.meal_plan === "MAP" ? "MAP (Breakfast + Dinner)" :
+                                                                                day.meal_plan === "AP" ? "AP (All Meals)" :
+                                                                                day.meal_plan === "EP" ? "EP (Breakfast Only)" : 
+                                                                                day.meal_plan}
+                              </p>
                             )}
+                            {/* Room prices are hidden in preview tab */}
                           </div>
-                        ))
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Display day notes */}
+                    {day.notes && (
+                      <div className="bg-white border p-3 rounded-md mb-4">
+                        <h4 className="font-medium text-gray-800 mb-2">Day Notes:</h4>
+                        <p className="text-sm whitespace-pre-line">{day.notes}</p>
+                      </div>
+                    )}
                   </div>
                 );
               })}
+            </div>
+            
+            {/* Add pricing summary to preview */}
+            <div className="mt-8 border-t pt-6">
+              <h3 className="text-xl font-semibold mb-4">Pricing Summary</h3>
+              <div className="space-y-2">
+                {/* Calculate totals */}
+                {(() => {
+                  let accommodationTotal = 0;
+                  let transportTotal = 0;
+                  
+                  // Calculate accommodation costs
+                  days.forEach(day => {
+                    if (day.room_price) {
+                      accommodationTotal += parseFloat(day.room_price);
+                    }
+                  });
+                  
+                  // Calculate transport costs
+                  days.forEach(day => {
+                    if (day.cab_price) {
+                      transportTotal += parseFloat(day.cab_price);
+                    }
+                  });
+                  
+                  // Calculate additional services
+                  const additionalServicesTotal = pricingOptions.additionalServices.reduce(
+                    (sum, service) => sum + service.price, 
+                    0
+                  );
+                  
+                  // Calculate subtotal
+                  const subtotal = accommodationTotal + transportTotal + additionalServicesTotal;
+                  
+                  // Calculate agent charges
+                  const agentCharges = pricingOptions.agentCharges;
+                  
+                  // Calculate tax
+                  const tax = subtotal * (pricingOptions.taxPercentage / 100);
+                  
+                  // Calculate total
+                  const total = subtotal + agentCharges + tax;
+                  
+                  return (
+                    <>
+                      {pricingOptions.additionalServices.length > 0 && (
+                        <div className="bg-white border rounded-md p-4 mb-4">
+                          <div className="text-sm font-medium mb-2">Additional Services</div>
+                          <div className="space-y-1">
+                            {pricingOptions.additionalServices.map(service => (
+                              <div key={service.id} className="flex justify-between text-sm">
+                                <span>{service.name}</span>
+                                <span>₹{pricingOptions.showPerPersonPrice && itinerary.customers?.adults ? 
+                                  Math.round(service.price / itinerary.customers.adults).toFixed(0) : 
+                                  service.price.toFixed(2)}</span>
+                              </div>
+                            ))}
+                            <div className="pt-2 mt-1 border-t flex justify-between font-medium">
+                              <span>Total Additional Services</span>
+                              <span>₹{pricingOptions.showPerPersonPrice && itinerary.customers?.adults ? 
+                                Math.round(additionalServicesTotal / itinerary.customers.adults).toFixed(0) : 
+                                additionalServicesTotal.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-md p-4">
+                        <div className="space-y-2">
+                          {/* Subtotal is hidden from customers */}
+                          
+                          {/* Hide agent charges in the UI but keep the calculation */}
+                          
+                          {pricingOptions.taxPercentage > 0 && (
+                            <div className="flex justify-between">
+                              <span>Tax ({pricingOptions.taxPercentage}%)</span>
+                              <span>₹{pricingOptions.showPerPersonPrice && itinerary.customers?.adults ? 
+                                Math.round(tax / itinerary.customers.adults).toFixed(0) : 
+                                tax.toFixed(2)}</span>
+                            </div>
+                          )}
+                          
+                          <div className="pt-2 mt-1 border-t flex justify-between font-bold text-lg">
+                            <span>
+                              {pricingOptions.showPerPersonPrice ? "Total Per Person" : "Total"}
+                              {pricingOptions.showPerPersonPrice && itinerary.customers?.adults && (
+                                <span className="text-xs font-normal ml-1">
+                                  (based on {itinerary.customers.adults} {itinerary.customers.adults === 1 ? "adult" : "adults"})
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-emerald-600">₹{pricingOptions.showPerPersonPrice && itinerary.customers?.adults ? 
+                              Math.round(total / itinerary.customers.adults).toFixed(0) : 
+                              total.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         </TabsContent>

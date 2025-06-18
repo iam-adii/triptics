@@ -37,8 +37,8 @@ const formSchema = z.object({
   booking_id: z.string().min(1, "Booking is required"),
   payment_id: z.string().min(1, "Payment ID is required"),
   amount: z.number().min(0.01, "Amount must be greater than 0"),
-  method: z.string().min(1, "Payment method is required"),
-  date: z.date({ required_error: "Payment date is required" }),
+  payment_method: z.string().min(1, "Payment method is required"),
+  payment_date: z.date({ required_error: "Payment date is required" }),
   status: z.string().default("Pending"),
   payment_type: z.string().default("Full"),
   notes: z.string().optional(),
@@ -67,6 +67,7 @@ export function PaymentForm({ payment, onSuccess, onCancel }: PaymentFormProps) 
     paidAmount: number;
     remainingAmount: number;
   }>({ totalAmount: 0, paidAmount: 0, remainingAmount: 0 });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -74,8 +75,8 @@ export function PaymentForm({ payment, onSuccess, onCancel }: PaymentFormProps) 
       booking_id: payment?.booking_id || "",
       payment_id: payment?.payment_id || `PAY-${Date.now().toString().slice(-6)}`,
       amount: payment?.amount || 0,
-      method: payment?.method || "Credit Card",
-      date: payment?.date ? new Date(payment.date) : new Date(),
+      payment_method: payment?.payment_method || "Credit Card",
+      payment_date: payment?.payment_date ? new Date(payment.payment_date) : new Date(),
       status: payment?.status || "Pending",
       payment_type: payment?.payment_type || "Partial",
       notes: payment?.notes || "",
@@ -211,70 +212,46 @@ export function PaymentForm({ payment, onSuccess, onCancel }: PaymentFormProps) 
   };
 
   async function onSubmit(values: FormValues) {
+    setIsSubmitting(true);
     try {
-      // Validate that a booking is selected
-      if (!values.booking_id || values.booking_id === "no-bookings") {
-        toast.error("Please select a valid booking");
-        return;
-      }
-      
+      // Prepare data for submission
       const paymentData = {
         booking_id: values.booking_id,
         payment_id: values.payment_id,
         amount: values.amount,
-        method: values.method,
-        date: format(values.date, "yyyy-MM-dd'T'HH:mm:ssX"),
+        payment_method: values.payment_method,
+        payment_date: format(values.payment_date, "yyyy-MM-dd"),
         status: values.status,
         payment_type: values.payment_type,
-        notes: values.notes || "",
+        notes: values.notes || null,
       };
 
-      console.log("Submitting payment data:", paymentData);
-
+      // Insert or update payment
+      let result;
       if (payment?.id) {
         // Update existing payment
-        const { error } = await supabase
+        result = await supabase
           .from("payments")
-          .update({
-            ...paymentData,
-            updated_at: new Date().toISOString(),
-          })
+          .update(paymentData)
           .eq("id", payment.id);
-
-        if (error) {
-          console.error("Supabase update error:", error);
-          throw error;
-        }
-        toast.success("Payment updated successfully");
       } else {
-        // Create new payment
-        const { data, error } = await supabase.from("payments").insert({
-          ...paymentData,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }).select();
-
-        if (error) {
-          console.error("Supabase insert error:", error);
-          throw error;
-        }
-        
-        console.log("Payment created successfully:", data);
-        toast.success("Payment recorded successfully");
+        // Insert new payment
+        result = await supabase
+          .from("payments")
+          .insert(paymentData);
       }
 
-      form.reset();
+      if (result.error) throw result.error;
+
+      toast.success(payment?.id ? "Payment updated successfully" : "Payment added successfully");
+      
+      // Call onSuccess callback if provided
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error("Error submitting payment:", error);
-      let errorMessage = "Failed to save payment. Please try again.";
-      
-      // If it's a specific known error type, provide more details
-      if (error instanceof Error) {
-        errorMessage = `Payment error: ${error.message}`;
-      }
-      
-      toast.error(errorMessage);
+      toast.error("Failed to save payment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -403,7 +380,7 @@ export function PaymentForm({ payment, onSuccess, onCancel }: PaymentFormProps) 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="method"
+            name="payment_method"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Payment Method *</FormLabel>
@@ -433,7 +410,7 @@ export function PaymentForm({ payment, onSuccess, onCancel }: PaymentFormProps) 
 
           <FormField
             control={form.control}
-            name="date"
+            name="payment_date"
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Payment Date *</FormLabel>
@@ -520,7 +497,7 @@ export function PaymentForm({ payment, onSuccess, onCancel }: PaymentFormProps) 
               Cancel
             </Button>
           )}
-          <Button type="submit" className="bg-emerald-500 hover:bg-emerald-600">
+          <Button type="submit" className="bg-emerald-500 hover:bg-emerald-600" disabled={isSubmitting}>
             {payment?.id ? "Update Payment" : "Record Payment"}
           </Button>
         </div>

@@ -10,6 +10,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +24,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Users } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -38,12 +39,19 @@ const formSchema = z.object({
   client_id: z.string().optional(),
   start_date: z.date().optional(),
   end_date: z.date().optional(),
-  budget: z.coerce.number().optional(),
   notes: z.string().optional(),
-  transfer_included: z.string().default("no"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  adults?: number;
+  children?: number;
+}
 
 export interface ItineraryFormProps {
   itinerary?: any;
@@ -53,9 +61,10 @@ export interface ItineraryFormProps {
 }
 
 export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }: ItineraryFormProps) {
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [savingAndBuilding, setSavingAndBuilding] = useState<boolean>(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Fetch customers for the dropdown
   useEffect(() => {
@@ -63,11 +72,19 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
       try {
         const { data, error } = await supabase
           .from("customers")
-          .select("id, name")
+          .select("id, name, email, phone, adults, children")
           .order("name");
         
         if (error) throw error;
         setCustomers(data || []);
+        
+        // If editing an existing itinerary, set the selected customer
+        if (itinerary?.client_id) {
+          const customer = data?.find(c => c.id === itinerary.client_id);
+          if (customer) {
+            setSelectedCustomer(customer);
+          }
+        }
       } catch (error) {
         console.error("Error fetching customers:", error);
         toast.error("Failed to load customers");
@@ -75,7 +92,7 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
     };
 
     fetchCustomers();
-  }, []);
+  }, [itinerary?.client_id]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -85,11 +102,16 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
       client_id: itinerary?.client_id || undefined,
       start_date: itinerary?.start_date ? new Date(itinerary.start_date) : undefined,
       end_date: itinerary?.end_date ? new Date(itinerary.end_date) : undefined,
-      budget: itinerary?.budget ? Number(itinerary.budget) : undefined,
       notes: itinerary?.notes || "",
-      transfer_included: itinerary?.transfer_included || "no",
     },
   });
+
+  // Handle customer selection
+  const handleCustomerChange = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    setSelectedCustomer(customer || null);
+    form.setValue("client_id", customerId);
+  };
 
   async function onSubmit(values: FormValues, openBuilder = false) {
     if (openBuilder) {
@@ -104,6 +126,9 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
         ? Math.ceil((values.end_date.getTime() - values.start_date.getTime()) / (1000 * 60 * 60 * 24)) + 1
         : undefined;
       
+      // Get selected customer's full data
+      let customerData = selectedCustomer;
+      
       let itineraryId = itinerary?.id;
       
       if (itineraryId) {
@@ -114,12 +139,14 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
             name: values.name,
             destination: values.destination,
             client_id: values.client_id,
+            customer_email: customerData?.email || null,
+            customer_phone: customerData?.phone || null,
+            adults: customerData?.adults || 0,
+            children: customerData?.children || 0,
             start_date: values.start_date?.toISOString().split('T')[0],
             end_date: values.end_date?.toISOString().split('T')[0],
             duration: duration,
-            budget: values.budget,
             notes: values.notes,
-            transfer_included: values.transfer_included,
             updated_at: new Date().toISOString(),
           })
           .eq("id", itineraryId);
@@ -137,13 +164,15 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
             name: values.name,
             destination: values.destination,
             client_id: values.client_id,
+            customer_email: customerData?.email || null,
+            customer_phone: customerData?.phone || null,
+            adults: customerData?.adults || 0,
+            children: customerData?.children || 0,
             start_date: values.start_date?.toISOString().split('T')[0],
             end_date: values.end_date?.toISOString().split('T')[0],
             duration: duration,
             status: "Draft",
-            budget: values.budget,
             notes: values.notes,
-            transfer_included: values.transfer_included,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -229,7 +258,7 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
             <FormItem>
               <FormLabel>Client</FormLabel>
               <Select
-                onValueChange={field.onChange}
+                onValueChange={handleCustomerChange}
                 value={field.value}
               >
                 <FormControl>
@@ -249,6 +278,30 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
             </FormItem>
           )}
         />
+
+        {selectedCustomer && (
+          <div className="border p-4 rounded-md bg-gray-50 dark:bg-gray-900 space-y-2">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-emerald-600" />
+              <h3 className="font-medium">Travel Group Details</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Adults</p>
+                <p className="text-sm">{selectedCustomer.adults || 0} (aged 8 and above)</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Children</p>
+                <p className="text-sm">{selectedCustomer.children || 0} (under age 8)</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm text-muted-foreground">
+                  Total travelers: {(selectedCustomer.adults || 0) + (selectedCustomer.children || 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
@@ -340,52 +393,6 @@ export function ItineraryForm({ itinerary, onSuccess, onCancel, onOpenBuilder }:
             Duration: {calculatedDuration} day{calculatedDuration > 1 ? 's' : ''}
           </div>
         )}
-
-        <FormField
-          control={form.control}
-          name="transfer_included"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Transfer Included</FormLabel>
-              <Select
-                onValueChange={field.onChange}
-                value={field.value}
-              >
-                <FormControl>
-                  <SelectTrigger className="h-11 sm:h-10">
-                    <SelectValue placeholder="Select option" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="yes">Yes</SelectItem>
-                  <SelectItem value="no">No</SelectItem>
-                  <SelectItem value="partial">Partial</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="budget"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Budget</FormLabel>
-              <FormControl>
-                <Input 
-                  type="number" 
-                  placeholder="e.g. 50000" 
-                  {...field} 
-                  value={field.value || ''}
-                  className="h-11 sm:h-10"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <FormField
           control={form.control}

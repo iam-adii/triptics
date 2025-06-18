@@ -173,11 +173,11 @@ export interface BookingItineraryProps {
       email?: string;
       phone?: string;
     } | null;
-    tours?: {
+    itineraries?: {
       name: string;
       description?: string;
-      days?: number;
-      location?: string;
+      duration?: number;
+      destination?: string;
     } | null;
     total_amount: number;
     status: string;
@@ -279,20 +279,20 @@ const BookingItinerary: React.FC<BookingItineraryProps> = ({ booking, companySet
           </View>
         </View>
 
-        {/* Tour Details */}
+        {/* Itinerary Details */}
         <View style={styles.infoSection}>
-          <Text style={styles.subtitle}>Tour Details</Text>
+          <Text style={styles.subtitle}>Itinerary Details</Text>
           <View style={styles.row}>
             <View style={styles.col}>
-              <Text style={styles.label}>TOUR NAME</Text>
-              <Text style={styles.value}>{booking.tours?.name || 'Custom Tour'}</Text>
+              <Text style={styles.label}>ITINERARY NAME</Text>
+              <Text style={styles.value}>{booking.itineraries?.name || 'Custom Itinerary'}</Text>
               
-              <Text style={styles.label}>LOCATION</Text>
-              <Text style={styles.value}>{booking.tours?.location || 'Multiple Destinations'}</Text>
+              <Text style={styles.label}>DESTINATION</Text>
+              <Text style={styles.value}>{booking.itineraries?.destination || 'Multiple Destinations'}</Text>
             </View>
             <View style={styles.col}>
               <Text style={styles.label}>DURATION</Text>
-              <Text style={styles.value}>{booking.tours?.days || '3'} Days</Text>
+              <Text style={styles.value}>{booking.itineraries?.duration || '3'} Days</Text>
               
               <Text style={styles.label}>TRAVEL DATES</Text>
               <Text style={styles.value}>
@@ -304,11 +304,11 @@ const BookingItinerary: React.FC<BookingItineraryProps> = ({ booking, companySet
           </View>
         </View>
 
-        {/* Tour Description */}
-        {booking.tours?.description && (
+        {/* Itinerary Description */}
+        {booking.itineraries?.description && (
           <View style={styles.infoSection}>
             <Text style={styles.subtitle}>Description</Text>
-            <Text style={styles.value}>{booking.tours.description}</Text>
+            <Text style={styles.value}>{booking.itineraries.description}</Text>
           </View>
         )}
 
@@ -332,7 +332,7 @@ const BookingItinerary: React.FC<BookingItineraryProps> = ({ booking, companySet
               <Text style={[styles.tableHeaderCell, { textAlign: 'right' }]}>Amount</Text>
             </View>
             <View style={styles.tableRow}>
-              <Text style={styles.tableCell}>{booking.tours?.name || 'Tour Package'}</Text>
+              <Text style={styles.tableCell}>{booking.itineraries?.name || 'Itinerary Package'}</Text>
               <Text style={[styles.tableCell, { textAlign: 'right' }]}>₹{booking.total_amount.toLocaleString()}</Text>
             </View>
             <View style={[styles.tableRow, { borderBottomWidth: 0, fontWeight: 'bold' }]}>

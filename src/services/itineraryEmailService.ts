@@ -2,7 +2,19 @@ import { toast } from 'sonner';
 import React from 'react';
 import ItineraryPDF from '@/components/itinerary/ItineraryPDF';
 import { Document, Page, pdf } from '@react-pdf/renderer';
-import { EMAIL_ENDPOINTS } from '@/config/email';
+import { EMAIL_ENDPOINTS } from '../config/email';
+import { checkEmailServer, callEmailApi } from './emailService';
+import { supabase } from '@/integrations/supabase/client';
+
+interface PricingOptions {
+  taxPercentage: number;
+  agentCharges: number;
+  additionalServices: {
+    id: string;
+    name: string;
+    price: number;
+  }[];
+}
 
 // Function to fetch company settings
 const fetchCompanySettings = async () => {
@@ -71,109 +83,90 @@ const createPdfBlob = async (itinerary: any, days: any[], activities: any[], com
 };
 
 // Standalone function to share the itinerary via email
-export async function shareItineraryViaEmail(
+export const shareItineraryViaEmail = async (
   itinerary: any,
   days: any[],
   activities: any[],
   recipientEmail?: string,
-  existingPdfBlob?: Blob
-) {
-  // Get company settings
-  const companySettings = await fetchCompanySettings();
-  
+  pdfBlob?: Blob,
+  pricingOptions?: PricingOptions
+) => {
   try {
-    // Get recipient email from itinerary's customer or the provided email
-    const recipient = recipientEmail || itinerary.customers?.email;
+    // Determine the recipient email
+    let email = recipientEmail;
     
-    if (!recipient) {
-      toast.error('No recipient email found');
-      return;
+    // If no email provided, use the customer's email from the itinerary
+    if (!email) {
+      email = itinerary.customer_email || itinerary.customers?.email;
+    }
+    
+    // If still no email, prompt the user to enter one
+    if (!email) {
+      email = prompt("Please enter the recipient's email address:");
+      if (!email) {
+        toast.error("Email address is required to send the itinerary");
+        return;
+      }
     }
     
     // Show loading toast
-    const loadingToast = toast.loading('Preparing email...');
+    const loadingToast = toast.loading("Sending email...");
     
     try {
-      // Get email settings
-      const settings = await fetchEmailSettings();
+      // Generate PDF if not provided
+      let pdfFile = pdfBlob;
       
-      if (!settings) {
-        toast.dismiss(loadingToast);
-        toast.error('Email settings not configured. Please check Settings > Email');
-        return;
+      if (!pdfFile) {
+        // Fetch company settings
+        const { data: companySettings } = await supabase
+          .from('company_settings')
+          .select('*')
+          .single();
+        
+        // Generate PDF using React.createElement for Document and Page structure
+        const pdfDoc = React.createElement(
+          Document,
+          {},
+          React.createElement(
+            Page,
+            { size: "A4", style: { padding: 30, fontFamily: 'Helvetica' } },
+            React.createElement(ItineraryPDF, {
+              itinerary: itinerary,
+              days: days,
+              activities: activities,
+              companySettings: companySettings,
+              pricingOptions: pricingOptions
+            })
+          )
+        );
+        
+        pdfFile = await pdf(pdfDoc).toBlob();
       }
       
-      // Check if email server is running
-      const { checkEmailServer, callEmailApi } = await import('@/services/emailService');
-      const isServerRunning = await checkEmailServer();
-      if (!isServerRunning) {
-        toast.dismiss(loadingToast);
-        toast.error('Email server is not running. Please start the email server first.');
-        return;
-      }
+      // Create a FormData object to send the PDF
+      const formData = new FormData();
+      formData.append('itineraryId', itinerary.id);
+      formData.append('recipientEmail', email);
+      formData.append('pdf', pdfFile, `${itinerary.name.replace(/\s+/g, '_')}.pdf`);
       
-      // Create itinerary details for the email
-      const itineraryDetails = {
-        itineraryName: itinerary.name,
-        destination: itinerary.destination || 'Your Destination',
-        startDate: itinerary.start_date ? new Date(itinerary.start_date).toLocaleDateString() : 'Not specified',
-        endDate: itinerary.end_date ? new Date(itinerary.end_date).toLocaleDateString() : 'Not specified',
-        customerName: itinerary.customers?.name || 'Valued Customer'
-      };
-      
-      // Use existing PDF blob if provided, otherwise generate a new one
-      let pdfBlob = existingPdfBlob;
-      
-      if (!pdfBlob) {
-        // Generate PDF blob - update the loading toast instead of creating a new one
-        toast.loading('Generating PDF...', { id: loadingToast });
-        pdfBlob = await createPdfBlob(itinerary, days, activities, companySettings);
-      }
-      
-      // If PDF generation failed, show error
-      if (!pdfBlob) {
-        toast.dismiss(loadingToast);
-        toast.error('Failed to generate PDF. Please try again.');
-        return;
-      }
-      
-      // Convert blob to byte array for sending
-      const arrayBuffer = await pdfBlob.arrayBuffer();
-      const pdfBytes = new Uint8Array(arrayBuffer);
-      
-      // Update toast
-      toast.loading(`Sending email to ${recipient}...`, { id: loadingToast });
-      
-      // Send the email with PDF attachment
-      const result = await callEmailApi(EMAIL_ENDPOINTS.itinerary, {
-        recipient,
-        itineraryDetails,
-        pdfBuffer: Array.from(pdfBytes),
-        settings
+      // Send the email using your API endpoint
+      const response = await fetch('/api/send-itinerary-email', {
+        method: 'POST',
+        body: formData,
       });
       
-      // Dismiss toast and show result
-      toast.dismiss(loadingToast);
-      
-      if (result.success) {
-        toast.success(`Itinerary sent to ${recipient}`);
-      } else {
-        toast.error(`Failed to send itinerary: ${result.error}`);
+      if (!response.ok) {
+        throw new Error('Failed to send email');
       }
-    } catch (error: any) {
-      toast.dismiss(loadingToast);
       
-      if (error.message && error.message.includes('Email server is not running')) {
-        toast.error('Email server is not running. Please start the server.');
-      } else if (error.message && error.message.includes('Email settings not configured')) {
-        toast.error('Email settings not configured. Please check Settings > Email.');
-      } else {
-        toast.error('Failed to send itinerary: ' + (error.message || 'Unknown error'));
-      }
-      console.error('Error processing itinerary email:', error);
+      toast.dismiss(loadingToast);
+      toast.success(`Itinerary sent to ${email}`);
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      throw error;
     }
-  } catch (error: any) {
-    console.error('Error processing itinerary email:', error);
-    toast.error('Failed to send itinerary email: ' + (error.message || 'Unknown error'));
+  } catch (error) {
+    console.error('Error sending itinerary email:', error);
+    toast.error('Failed to send email. Please try again.');
   }
-} 
+}; 

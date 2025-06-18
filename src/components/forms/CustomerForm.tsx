@@ -10,12 +10,13 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Search, UserPlus, Send } from "lucide-react";
+import { Loader2, Search, UserPlus, Send, Users } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
   Command,
@@ -41,9 +42,11 @@ import { useCompanySettings } from "@/contexts/CompanySettingsContext";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
+  email: z.string().email("Invalid email address").optional(),
+  phone: z.string().min(1, "Phone number is required"),
   address: z.string().optional(),
+  adults: z.coerce.number().int().min(0, "Must be 0 or more").default(0),
+  children: z.coerce.number().int().min(0, "Must be 0 or more").default(0),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -86,6 +89,8 @@ export function CustomerForm({ customer, onSuccess, onCancel }: CustomerFormProp
       email: customer?.email || "",
       phone: customer?.phone || "",
       address: customer?.address || "",
+      adults: customer?.adults || 0,
+      children: customer?.children || 0,
     },
   });
 
@@ -231,6 +236,8 @@ ${companySettings.address ? `🏢 ${companySettings.address}` : ""}`;
             email: values.email,
             phone: values.phone,
             address: values.address,
+            adults: values.adults,
+            children: values.children,
             updated_at: new Date().toISOString(),
           })
           .eq("id", customer.id);
@@ -243,6 +250,8 @@ ${companySettings.address ? `🏢 ${companySettings.address}` : ""}`;
           email: values.email,
           phone: values.phone,
           address: values.address,
+          adults: values.adults,
+          children: values.children,
           total_bookings: 0,
           total_spent: 0.00,
           created_at: new Date().toISOString(),
@@ -251,20 +260,16 @@ ${companySettings.address ? `🏢 ${companySettings.address}` : ""}`;
         if (error) throw error;
         toast.success("Customer created successfully");
         
-        // Show greeting dialog for new customers if they have a phone number
-        if (values.phone) {
-          setNewCustomerData(values);
-          setShowGreetingDialog(true);
-        } else {
-          if (onSuccess) onSuccess();
-        }
+        // Show greeting dialog for new customers since phone is now mandatory
+        setNewCustomerData(values);
+        setShowGreetingDialog(true);
       }
       form.reset();
     } catch (error) {
       toast.error("Failed to save customer. Please try again.");
       setIsSubmitting(false);
     } finally {
-      if (customer?.id || !values.phone) {
+      if (customer?.id) {
         setIsSubmitting(false);
       }
     }
@@ -326,12 +331,11 @@ ${companySettings.address ? `🏢 ${companySettings.address}` : ""}`;
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email *</FormLabel>
+                <FormLabel>Email</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder="Email address" 
-                    {...field} 
-                    required 
+                    {...field}
                     className="bg-background"
                   />
                 </FormControl>
@@ -345,11 +349,12 @@ ${companySettings.address ? `🏢 ${companySettings.address}` : ""}`;
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone</FormLabel>
+                <FormLabel>Phone *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder="Phone number" 
-                    {...field} 
+                    {...field}
+                    required
                     className="bg-background"
                   />
                 </FormControl>
@@ -357,6 +362,61 @@ ${companySettings.address ? `🏢 ${companySettings.address}` : ""}`;
               </FormItem>
             )}
           />
+
+          <div className="border p-4 rounded-md bg-gray-50 dark:bg-gray-900 space-y-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-emerald-600" />
+              <h3 className="font-medium">Travel Group Details</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="adults"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Adults</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0"
+                        placeholder="0" 
+                        {...field}
+                        className="bg-background"
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Travelers aged 8 and above
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="children"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Children</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0"
+                        placeholder="0" 
+                        {...field}
+                        className="bg-background"
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Travelers under the age of 8
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
 
           <FormField
             control={form.control}

@@ -24,9 +24,9 @@ export interface GeneratePDFOptions {
 }
 
 // Fetch company settings
-export const getCompanySettings = async () => {
-  // Check if we have cached company settings
-  if (typeof window !== 'undefined' && window.companySettingsCache) {
+export const getCompanySettings = async (forceRefresh = false) => {
+  // Check if we have cached company settings and not forcing refresh
+  if (!forceRefresh && typeof window !== 'undefined' && window.companySettingsCache) {
     return window.companySettingsCache;
   }
   
@@ -164,6 +164,14 @@ declare global {
   interface Window {
     companySettingsCache?: any;
   }
+}
+
+// Add event listener to clear cache when company settings are updated
+if (typeof window !== 'undefined') {
+  window.addEventListener('company-settings-updated', () => {
+    console.log('Company settings updated event received, clearing cache');
+    window.companySettingsCache = null;
+  });
 }
 
 /**

@@ -32,7 +32,7 @@ const PDFWrapper: React.FC<PDFWrapperProps> = ({ type, data, companySettings: pr
         // Fetch company settings from database if not provided via props
         if (!propCompanySettings) {
           console.log('Fetching company settings from database...');
-          const settings = await getCompanySettings();
+          const settings = await getCompanySettings(true); // Force refresh to get latest settings
           console.log('Retrieved company settings:', settings);
           setDbCompanySettings(settings);
         } else {

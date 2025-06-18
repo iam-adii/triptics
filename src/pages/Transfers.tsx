@@ -80,6 +80,7 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { useCompanySettings } from "@/contexts/CompanySettingsContext";
 import TransferDetails from "@/components/TransferDetails";
 import { pdf } from "@react-pdf/renderer";
+import { Link } from "react-router-dom";
 
 interface Transfer {
   id: string;
@@ -756,6 +757,79 @@ export default function Transfers() {
     };
   };
 
+  // Add this function before the return statement
+  const handleSaveTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer) {
+      toast.error("Please select a customer");
+      return;
+    }
+
+    // Validate required fields
+    const requiredFields = [
+      "vehicle_type",
+      "vehicle_number",
+      "pickup_location",
+      "drop_location",
+      "pickup_date",
+      "pickup_time",
+      "driver_name",
+      "driver_contact",
+    ];
+
+    const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
+    if (missingFields.length > 0) {
+      toast.error(`Please fill in all required fields: ${missingFields.join(", ")}`);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Combine date and time into a datetime string
+      const dateStr = format(formData.pickup_date, "yyyy-MM-dd");
+      const timeStr = formData.pickup_time;
+      const pickup_datetime = `${dateStr}T${timeStr}`;
+      
+      const transferData = {
+        customer_id: selectedCustomer.id,
+        ...formData,
+        pickup_datetime,
+        price: 0, // Set a default price since it's required
+        date: format(formData.pickup_date, "yyyy-MM-dd") // Set the date field explicitly
+      };
+      delete transferData.pickup_date;
+      delete transferData.pickup_time;
+
+      // Save the transfer
+      await createTransfer.mutateAsync(transferData);
+      
+      toast.success("Transfer saved successfully");
+      
+      // Reset form
+      setFormData({
+        vehicle_type: "",
+        vehicle_number: "",
+        pickup_location: "",
+        drop_location: "",
+        pickup_date: new Date(),
+        pickup_time: "",
+        driver_name: "",
+        driver_contact: "",
+        notes: "",
+      });
+      setSelectedCustomer(null);
+      setSearchQuery("");
+      
+      // Close the dialog
+      setShowDialog(false);
+    } catch (error) {
+      console.error("Error saving transfer:", error);
+      toast.error(`Failed to save transfer: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (isLoadingCustomers || isLoadingTransfers) {
     return <PageLoader />;
   }
@@ -767,6 +841,9 @@ export default function Transfers() {
           <h1 className="text-2xl sm:text-3xl font-bold">Transfers</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Manage cab transfers for customers.
+            <Link to="/transfer-routes" className="text-emerald-600 hover:text-emerald-700 ml-2 underline underline-offset-2">
+              Manage Transfer Routes
+            </Link>
           </p>
         </div>
         <Button onClick={() => setShowDialog(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white">
@@ -833,10 +910,10 @@ export default function Transfers() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Vehicles</SelectItem>
-              <SelectItem value="sedan">Sedan</SelectItem>
-              <SelectItem value="suv">SUV</SelectItem>
-              <SelectItem value="luxury">Luxury</SelectItem>
-              <SelectItem value="van">Van</SelectItem>
+              <SelectItem value="WagonR/Hatchback">WagonR/Hatchback</SelectItem>
+              <SelectItem value="Innova/Xylo">Innova/Xylo</SelectItem>
+              <SelectItem value="Innova Crysta">Innova Crysta</SelectItem>
+              <SelectItem value="Sumo/Bolero">Sumo/Bolero</SelectItem>
             </SelectContent>
           </Select>
 
@@ -1088,7 +1165,7 @@ export default function Transfers() {
               Create New Transfer
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSaveAndShareWhatsApp} className="space-y-4 mt-2">
+          <form onSubmit={handleSaveTransfer} className="space-y-4 mt-2">
             <div className="space-y-2 relative">
               <Label>Customer</Label>
               <div className="relative">
@@ -1146,10 +1223,10 @@ export default function Transfers() {
                     <SelectValue placeholder="Select vehicle type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="sedan">Sedan</SelectItem>
-                    <SelectItem value="suv">SUV</SelectItem>
-                    <SelectItem value="luxury">Luxury</SelectItem>
-                    <SelectItem value="van">Van</SelectItem>
+                    <SelectItem value="WagonR/Hatchback">WagonR/Hatchback</SelectItem>
+                    <SelectItem value="Innova/Xylo">Innova/Xylo</SelectItem>
+                    <SelectItem value="Innova Crysta">Innova Crysta</SelectItem>
+                    <SelectItem value="Sumo/Bolero">Sumo/Bolero</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1288,12 +1365,21 @@ export default function Transfers() {
             <div className="flex flex-col sm:flex-row justify-center gap-4 mt-4">
               <Button 
                 type="button" 
+                className="flex-1"
+                onClick={handleSaveTransfer}
+                disabled={isLoadingCustomers || !selectedCustomer}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                <span>Save</span>
+              </Button>
+              <Button 
+                type="button" 
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
                 onClick={handleSaveAndShareWhatsApp}
                 disabled={isLoadingCustomers || !selectedCustomer}
               >
                 <Share2 className="mr-2 h-4 w-4" />
-                <span className="hidden xs:inline">Share on WhatsApp</span>
+                <span className="hidden xs:inline">WhatsApp</span>
                 <span className="xs:hidden">WhatsApp</span>
               </Button>
               <Button 

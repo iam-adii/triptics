@@ -28,11 +28,33 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Upload, Key, AlertTriangle, Eye, EyeOff, Send } from "lucide-react";
+import { Loader2, Upload, Key, AlertTriangle, Eye, EyeOff, Send, Plus, Trash2, PenLine, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { fetchEmailSettings, saveEmailSettings, testEmailSettings, EmailSettings } from "@/services/emailService";
+import { fetchEmailSettings, saveEmailSettings, testEmailSettings, EmailSettings } from "../services/emailService";
+import UserManagement from "@/components/settings/UserManagement";
+import PermissionSettings from "@/components/settings/PermissionSettings";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNotifications } from "@/contexts/NotificationContext";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 interface CompanySettings {
   id: string;
@@ -81,12 +103,34 @@ interface EmailSettingsState {
   sender_email: string;
 }
 
+interface TransferRoute {
+  id: string;
+  name: string;
+  description: string;
+  cab_types: CabType[];
+}
+
+interface CabType {
+  id: string;
+  name: string;
+  price: number;
+}
+
+// Add new interface for Terms & Conditions
+interface TermsAndConditions {
+  id: string;
+  inclusions: string[];
+  exclusions: string[];
+  terms: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [emailSettings, setEmailSettings] = useState<EmailSettingsState>({
@@ -105,9 +149,67 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const { currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'admin';
+  
+  // Use the notification context
+  const { 
+    notificationSettings, 
+    loading: notificationsLoading, 
+    saveNotificationSettings 
+  } = useNotifications();
+
+  // New state for transfer routes
+  const [transferRoutes, setTransferRoutes] = useState<TransferRoute[]>([]);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
+  const [isSavingRoute, setIsSavingRoute] = useState(false);
+  
+  // New state for route form
+  const [newRoute, setNewRoute] = useState<{
+    id?: string;
+    name: string;
+    description: string;
+  }>({
+    name: "",
+    description: "",
+  });
+  
+  // New state for cab type form
+  const [newCabType, setNewCabType] = useState<{
+    routeId: string;
+    name: string;
+    price: number;
+  }>({
+    routeId: "",
+    name: "",
+    price: 0,
+  });
+  
+  // Dialog states
+  const [isRouteDialogOpen, setIsRouteDialogOpen] = useState(false);
+  const [isCabTypeDialogOpen, setIsCabTypeDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // New state for transfer routes search and pagination
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [routesPerPage] = useState(5);
+
+  // Add new state for Terms & Conditions
+  const [termsAndConditions, setTermsAndConditions] = useState<TermsAndConditions>({
+    id: '',
+    inclusions: [''],
+    exclusions: [''],
+    terms: [''],
+    created_at: '',
+    updated_at: ''
+  });
+
   // Fetch settings on component mount
   useEffect(() => {
     fetchSettings();
+    fetchTransferRoutes();
+    fetchTermsAndConditions();
   }, []);
 
   const fetchSettings = async () => {
@@ -178,9 +280,9 @@ export default function Settings() {
   // Handle toggle changes for notification settings
   const handleNotificationToggle = (field: keyof NotificationSettings) => {
     if (notificationSettings) {
-      setNotificationSettings({
-        ...notificationSettings,
-        [field]: !notificationSettings[field],
+      // Use the saveNotificationSettings function from the context
+      saveNotificationSettings({
+        [field]: !notificationSettings[field]
       });
     }
   };
@@ -257,6 +359,14 @@ export default function Settings() {
         if (error) throw error;
       }
       
+      // Clear the company settings cache
+      if (typeof window !== 'undefined') {
+        window.companySettingsCache = null;
+      }
+      
+      // Dispatch an event to notify other components that settings have been updated
+      window.dispatchEvent(new Event('company-settings-updated'));
+      
       toast.success("Company settings saved successfully");
     } catch (error: any) {
       console.error("Error saving company settings:", error);
@@ -322,56 +432,18 @@ export default function Settings() {
     }
   };
 
-  // Save notification settings
-  const saveNotificationSettings = async () => {
-    if (!notificationSettings) return;
-    
+  // Save notification settings - this function is no longer needed as we're using the context
+  const saveNotificationSettingsHandler = async () => {
     setSaving(true);
     try {
-      // Check if settings already exist
-      const { data: existingData, error: queryError } = await supabase
-        .from("notification_settings")
-        .select("id")
-        .eq("user_id", notificationSettings.user_id)
-        .limit(1);
+      // Use the saveNotificationSettings function from the context
+      const success = await saveNotificationSettings({});
       
-      if (existingData && existingData.length > 0) {
-        // Update existing record
-        const { error } = await supabase
-          .from("notification_settings")
-          .update({
-            new_leads: notificationSettings.new_leads,
-            new_bookings: notificationSettings.new_bookings,
-            payment_receipts: notificationSettings.payment_receipts,
-            tour_reminders: notificationSettings.tour_reminders,
-            marketing_emails: notificationSettings.marketing_emails,
-            push_leads: notificationSettings.push_leads,
-            push_bookings: notificationSettings.push_bookings,
-            push_payments: notificationSettings.push_payments
-          })
-          .eq("id", existingData[0].id);
-          
-        if (error) throw error;
+      if (success) {
+        toast.success("Notification preferences saved");
       } else {
-        // Insert new record
-        const { error } = await supabase
-          .from("notification_settings")
-          .insert({
-            user_id: notificationSettings.user_id,
-            new_leads: notificationSettings.new_leads,
-            new_bookings: notificationSettings.new_bookings,
-            payment_receipts: notificationSettings.payment_receipts,
-            tour_reminders: notificationSettings.tour_reminders,
-            marketing_emails: notificationSettings.marketing_emails,
-            push_leads: notificationSettings.push_leads,
-            push_bookings: notificationSettings.push_bookings,
-            push_payments: notificationSettings.push_payments
-          });
-          
-        if (error) throw error;
+        toast.error("Failed to save notification preferences");
       }
-      
-      toast.success("Notification preferences saved");
     } catch (error: any) {
       console.error("Error saving notification settings:", error);
       toast.error("Error saving notification settings: " + error.message);
@@ -476,7 +548,340 @@ export default function Settings() {
     }
   };
 
-  if (loading) {
+  // Fetch transfer routes
+  const fetchTransferRoutes = async () => {
+    setIsLoadingRoutes(true);
+    try {
+      // Fetch routes from Supabase
+      const { data: routes, error: routesError } = await supabase
+        .from("transfer_routes")
+        .select("*")
+        .order("name");
+      
+      if (routesError) throw routesError;
+      
+      // Fetch cab types for each route
+      const routesWithCabTypes = await Promise.all(
+        (routes || []).map(async (route) => {
+          const { data: cabTypes, error: cabTypesError } = await supabase
+            .from("transfer_cab_types")
+            .select("*")
+            .eq("route_id", route.id)
+            .order("name");
+          
+          if (cabTypesError) throw cabTypesError;
+          
+          return {
+            ...route,
+            cab_types: cabTypes || [],
+          };
+        })
+      );
+      
+      setTransferRoutes(routesWithCabTypes);
+    } catch (error: any) {
+      console.error("Error fetching transfer routes:", error);
+      toast.error("Failed to load transfer routes");
+    } finally {
+      setIsLoadingRoutes(false);
+    }
+  };
+  
+  // Add or update a transfer route
+  const handleSaveRoute = async () => {
+    setIsSavingRoute(true);
+    try {
+      if (!newRoute.name.trim()) {
+        toast.error("Route name is required");
+        return;
+      }
+      
+      let routeId = newRoute.id;
+      
+      if (isEditMode && routeId) {
+        // Update existing route
+        const { error } = await supabase
+          .from("transfer_routes")
+          .update({
+            name: newRoute.name,
+            description: newRoute.description,
+          })
+          .eq("id", routeId);
+        
+        if (error) throw error;
+        
+        toast.success("Route updated successfully");
+      } else {
+        // Add new route
+        const { data, error } = await supabase
+          .from("transfer_routes")
+          .insert({
+            name: newRoute.name,
+            description: newRoute.description,
+          })
+          .select();
+        
+        if (error) throw error;
+        
+        routeId = data[0].id;
+        toast.success("Route added successfully");
+      }
+      
+      // Reset form and close dialog
+      setNewRoute({
+        name: "",
+        description: "",
+      });
+      setIsRouteDialogOpen(false);
+      setIsEditMode(false);
+      
+      // Refresh routes
+      fetchTransferRoutes();
+    } catch (error: any) {
+      console.error("Error saving route:", error);
+      toast.error("Failed to save route: " + error.message);
+    } finally {
+      setIsSavingRoute(false);
+    }
+  };
+  
+  // Delete a transfer route
+  const handleDeleteRoute = async (routeId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this route? This will also delete all associated cab types."
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      // Delete cab types first (cascade delete would be better if available)
+      const { error: cabTypesError } = await supabase
+        .from("transfer_cab_types")
+        .delete()
+        .eq("route_id", routeId);
+      
+      if (cabTypesError) throw cabTypesError;
+      
+      // Delete route
+      const { error } = await supabase
+        .from("transfer_routes")
+        .delete()
+        .eq("id", routeId);
+      
+      if (error) throw error;
+      
+      toast.success("Route deleted successfully");
+      
+      // Refresh routes
+      fetchTransferRoutes();
+    } catch (error: any) {
+      console.error("Error deleting route:", error);
+      toast.error("Failed to delete route: " + error.message);
+    }
+  };
+  
+  // Add or update a cab type
+  const handleSaveCabType = async () => {
+    try {
+      if (!newCabType.name.trim()) {
+        toast.error("Cab type name is required");
+        return;
+      }
+      
+      if (newCabType.price <= 0) {
+        toast.error("Price must be greater than zero");
+        return;
+      }
+      
+      // Add new cab type
+      const { error } = await supabase
+        .from("transfer_cab_types")
+        .insert({
+          route_id: newCabType.routeId,
+          name: newCabType.name,
+          price: newCabType.price,
+        });
+      
+      if (error) throw error;
+      
+      toast.success("Cab type added successfully");
+      
+      // Reset form and close dialog
+      setNewCabType({
+        routeId: "",
+        name: "",
+        price: 0,
+      });
+      setIsCabTypeDialogOpen(false);
+      
+      // Refresh routes
+      fetchTransferRoutes();
+    } catch (error: any) {
+      console.error("Error saving cab type:", error);
+      toast.error("Failed to save cab type: " + error.message);
+    }
+  };
+  
+  // Delete a cab type
+  const handleDeleteCabType = async (cabTypeId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this cab type?"
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const { error } = await supabase
+        .from("transfer_cab_types")
+        .delete()
+        .eq("id", cabTypeId);
+      
+      if (error) throw error;
+      
+      toast.success("Cab type deleted successfully");
+      
+      // Refresh routes
+      fetchTransferRoutes();
+    } catch (error: any) {
+      console.error("Error deleting cab type:", error);
+      toast.error("Failed to delete cab type: " + error.message);
+    }
+  };
+  
+  // Open edit route dialog
+  const handleEditRoute = (route: TransferRoute) => {
+    setNewRoute({
+      id: route.id,
+      name: route.name,
+      description: route.description,
+    });
+    setIsEditMode(true);
+    setIsRouteDialogOpen(true);
+  };
+  
+  // Open add cab type dialog
+  const handleAddCabType = (routeId: string) => {
+    setNewCabType({
+      routeId,
+      name: "",
+      price: 0,
+    });
+    setIsCabTypeDialogOpen(true);
+  };
+
+  // Filter routes based on search query
+  const filteredRoutes = transferRoutes.filter(route => 
+    route.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (route.description && route.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+  
+  // Calculate pagination
+  const indexOfLastRoute = currentPage * routesPerPage;
+  const indexOfFirstRoute = indexOfLastRoute - routesPerPage;
+  const currentRoutes = filteredRoutes.slice(indexOfFirstRoute, indexOfLastRoute);
+  const totalPages = Math.ceil(filteredRoutes.length / routesPerPage);
+  
+  // Change page
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+  
+  // Reset pagination when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Add new function to fetch Terms & Conditions
+  const fetchTermsAndConditions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('terms_and_conditions')
+        .select('*')
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No record found, create default
+          const defaultTerms = {
+            inclusions: [''],
+            exclusions: [''],
+            terms: ['']
+          };
+          const { data: newData, error: insertError } = await supabase
+            .from('terms_and_conditions')
+            .insert(defaultTerms)
+            .select()
+            .single();
+
+          if (insertError) throw insertError;
+          setTermsAndConditions(newData);
+        } else {
+          throw error;
+        }
+      } else {
+        setTermsAndConditions(data);
+      }
+    } catch (error: any) {
+      console.error('Error fetching terms and conditions:', error);
+      toast.error('Failed to load terms and conditions');
+    }
+  };
+
+  // Add new function to save Terms & Conditions
+  const saveTermsAndConditions = async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('terms_and_conditions')
+        .upsert({
+          id: termsAndConditions.id || undefined,
+          inclusions: termsAndConditions.inclusions.filter(item => item.trim() !== ''),
+          exclusions: termsAndConditions.exclusions.filter(item => item.trim() !== ''),
+          terms: termsAndConditions.terms.filter(item => item.trim() !== ''),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+      toast.success('Terms and conditions saved successfully');
+    } catch (error: any) {
+      console.error('Error saving terms and conditions:', error);
+      toast.error('Failed to save terms and conditions');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Add new function to handle array item changes
+  const handleArrayItemChange = (
+    array: string[],
+    index: number,
+    value: string,
+    setter: (value: string[]) => void
+  ) => {
+    const newArray = [...array];
+    newArray[index] = value;
+    setter(newArray);
+  };
+
+  // Add new function to add new array item
+  const addArrayItem = (
+    array: string[],
+    setter: (value: string[]) => void
+  ) => {
+    setter([...array, '']);
+  };
+
+  // Add new function to remove array item
+  const removeArrayItem = (
+    array: string[],
+    index: number,
+    setter: (value: string[]) => void
+  ) => {
+    const newArray = array.filter((_, i) => i !== index);
+    setter(newArray);
+  };
+
+  if (loading || notificationsLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-2">
@@ -488,710 +893,632 @@ export default function Settings() {
   }
 
   return (
-    <div className="container max-w-6xl mx-auto p-6 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your account preferences and application settings
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
       </div>
 
-      <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="w-full max-w-md grid grid-cols-5 mb-8">
-          <TabsTrigger value="profile" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">Profile</TabsTrigger>
-          <TabsTrigger value="company" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">Company</TabsTrigger>
-          <TabsTrigger value="email" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">Email</TabsTrigger>
-          <TabsTrigger value="notifications" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">Notifications</TabsTrigger>
-          <TabsTrigger value="advanced" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">Advanced</TabsTrigger>
+      <Tabs defaultValue="company" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
+          <TabsTrigger value="terms">Terms & Conditions</TabsTrigger>
+          {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
 
-        <div className="mt-4 grid gap-6">
-          <TabsContent value="profile" className="space-y-6">
-            <Card className="bg-card/50 backdrop-blur border-border/30">
-              <CardHeader>
-                <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Profile Information</CardTitle>
-                <CardDescription>
-                  Update your personal information and profile picture
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-6 items-start">
-                  <div className="flex flex-col items-center gap-4">
-                    <Avatar className="h-32 w-32 border-4 border-background">
-                      <AvatarImage src={avatarPreview || userSettings?.avatar_url || ""} />
-                      <AvatarFallback className="bg-emerald-500 text-white text-2xl">
-                        {userSettings?.first_name?.[0]}{userSettings?.last_name?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <label htmlFor="avatar-upload">
-                      <div className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md cursor-pointer transition-colors">
-                        <Upload className="h-4 w-4" />
-                        Change Avatar
-                      </div>
-                      <input
-                        id="avatar-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                  <div className="flex-1 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input 
-                          id="firstName" 
-                          value={userSettings?.first_name || ""} 
-                          onChange={(e) => handleUserChange("first_name", e.target.value)}
-                          className="bg-background/50"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input 
-                          id="lastName" 
-                          value={userSettings?.last_name || ""}
-                          onChange={(e) => handleUserChange("last_name", e.target.value)}
-                          className="bg-background/50"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        value={userSettings?.email || ""}
-                        onChange={(e) => handleUserChange("email", e.target.value)}
-                        className="bg-background/50"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone</Label>
-                      <Input 
-                        id="phone" 
-                        type="tel" 
-                        value={userSettings?.phone || ""}
-                        onChange={(e) => handleUserChange("phone", e.target.value)}
-                        className="bg-background/50"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="justify-end">
-                <Button 
-                  onClick={saveUserSettings} 
-                  disabled={saving}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                    </>
-                  ) : "Save Changes"}
-                </Button>
-              </CardFooter>
-            </Card>
-
-            <Card className="bg-card/50 backdrop-blur border-border/30">
-              <CardHeader>
-                <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Password</CardTitle>
-                <CardDescription>
-                  Update your login password
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        {/* Company Settings Tab */}
+        <TabsContent value="company" className="space-y-4">
+          <Card className="bg-card/50 backdrop-blur border-border/30">
+            <CardHeader>
+              <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Company Information</CardTitle>
+              <CardDescription>
+                Update your company details and branding
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input 
-                    id="currentPassword" 
-                    type="password" 
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="bg-background/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <Input 
-                    id="newPassword" 
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="bg-background/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                  <Input 
-                    id="confirmPassword" 
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="bg-background/50"
-                  />
-                </div>
-              </CardContent>
-              <CardFooter className="justify-end">
-                <Button 
-                  onClick={handlePasswordChange} 
-                  disabled={saving}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...
-                    </>
-                  ) : "Update Password"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="company" className="space-y-6">
-            <Card className="bg-card/50 backdrop-blur border-border/30">
-              <CardHeader>
-                <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Company Information</CardTitle>
-                <CardDescription>
-                  Update your company details and branding
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName" className="flex items-center">
-                      Company Name <span className="text-red-500 ml-1">*</span>
-                    </Label>
-                    <Input 
-                      id="companyName" 
-                      value={companySettings?.name || ""}
-                      onChange={(e) => handleCompanyChange("name", e.target.value)}
-                      className="bg-background/50"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="website" className="flex items-center">
-                      Website <span className="text-red-500 ml-1">*</span>
-                    </Label>
-                    <Input 
-                      id="website" 
-                      type="url" 
-                      value={companySettings?.website || ""}
-                      onChange={(e) => handleCompanyChange("website", e.target.value)}
-                      className="bg-background/50"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyEmail">Email</Label>
-                    <Input 
-                      id="companyEmail" 
-                      type="email" 
-                      value={companySettings?.email || ""}
-                      onChange={(e) => handleCompanyChange("email", e.target.value)}
-                      className="bg-background/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyPhone">Phone</Label>
-                    <Input 
-                      id="companyPhone" 
-                      type="tel" 
-                      value={companySettings?.phone || ""}
-                      onChange={(e) => handleCompanyChange("phone", e.target.value)}
-                      className="bg-background/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gstin">GSTIN Number</Label>
-                  <Input 
-                    id="gstin" 
-                    value={companySettings?.gstin || ""}
-                    onChange={(e) => handleCompanyChange("gstin", e.target.value)}
-                    className="bg-background/50"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="address" className="flex items-center">
-                    Address <span className="text-red-500 ml-1">*</span>
+                  <Label htmlFor="companyName" className="flex items-center">
+                    Company Name <span className="text-red-500 ml-1">*</span>
                   </Label>
-                  <Textarea 
-                    id="address" 
-                    rows={3} 
-                    value={companySettings?.address || ""}
-                    onChange={(e) => handleCompanyChange("address", e.target.value)}
-                    className="bg-background/50 resize-none"
+                  <Input 
+                    id="companyName" 
+                    value={companySettings?.name || ""}
+                    onChange={(e) => handleCompanyChange("name", e.target.value)}
+                    className="bg-background/50"
                     required
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="website" className="flex items-center">
+                    Website <span className="text-red-500 ml-1">*</span>
+                  </Label>
+                  <Input 
+                    id="website" 
+                    type="url" 
+                    value={companySettings?.website || ""}
+                    onChange={(e) => handleCompanyChange("website", e.target.value)}
+                    className="bg-background/50"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="companyEmail">Email</Label>
+                  <Input 
+                    id="companyEmail" 
+                    type="email" 
+                    value={companySettings?.email || ""}
+                    onChange={(e) => handleCompanyChange("email", e.target.value)}
+                    className="bg-background/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="companyPhone">Phone</Label>
+                  <Input 
+                    id="companyPhone" 
+                    type="tel" 
+                    value={companySettings?.phone || ""}
+                    onChange={(e) => handleCompanyChange("phone", e.target.value)}
+                    className="bg-background/50"
+                  />
+                </div>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Select 
-                      value={companySettings?.country || "us"}
-                      onValueChange={(value) => handleCompanyChange("country", value)}
-                    >
-                      <SelectTrigger id="country" className="bg-background/50">
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="us">United States</SelectItem>
-                        <SelectItem value="ca">Canada</SelectItem>
-                        <SelectItem value="uk">United Kingdom</SelectItem>
-                        <SelectItem value="in">India</SelectItem>
-                        <SelectItem value="au">Australia</SelectItem>
-                        <SelectItem value="sg">Singapore</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <div className="space-y-2">
+                <Label htmlFor="gstin">GSTIN Number</Label>
+                <Input 
+                  id="gstin" 
+                  value={companySettings?.gstin || ""}
+                  onChange={(e) => handleCompanyChange("gstin", e.target.value)}
+                  className="bg-background/50"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="address" className="flex items-center">
+                  Address <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <Textarea 
+                  id="address" 
+                  rows={3} 
+                  value={companySettings?.address || ""}
+                  onChange={(e) => handleCompanyChange("address", e.target.value)}
+                  className="bg-background/50 resize-none"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="country">Country</Label>
+                  <Select 
+                    value={companySettings?.country || "us"}
+                    onValueChange={(value) => handleCompanyChange("country", value)}
+                  >
+                    <SelectTrigger id="country" className="bg-background/50">
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="us">United States</SelectItem>
+                      <SelectItem value="ca">Canada</SelectItem>
+                      <SelectItem value="uk">United Kingdom</SelectItem>
+                      <SelectItem value="in">India</SelectItem>
+                      <SelectItem value="au">Australia</SelectItem>
+                      <SelectItem value="sg">Singapore</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="timezone">Timezone</Label>
+                  <Select 
+                    value={companySettings?.timezone || "est"}
+                    onValueChange={(value) => handleCompanyChange("timezone", value)}
+                  >
+                    <SelectTrigger id="timezone" className="bg-background/50">
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="est">Eastern Time (ET)</SelectItem>
+                      <SelectItem value="cst">Central Time (CT)</SelectItem>
+                      <SelectItem value="mst">Mountain Time (MT)</SelectItem>
+                      <SelectItem value="pst">Pacific Time (PT)</SelectItem>
+                      <SelectItem value="ist">India Standard Time (IST)</SelectItem>
+                      <SelectItem value="gmt">GMT/UTC</SelectItem>
+                      <SelectItem value="bst">British Summer Time (BST)</SelectItem>
+                      <SelectItem value="aest">Australian Eastern Time (AET)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button 
+                onClick={saveCompanySettings} 
+                disabled={saving}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  </>
+                ) : "Save Company Details"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        {/* Notification Settings Tab */}
+        <TabsContent value="notifications" className="space-y-4">
+          <Card className="bg-card/50 backdrop-blur border-border/30">
+            <CardHeader>
+              <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Email Notifications</CardTitle>
+              <CardDescription>
+                Choose what types of email notifications you want to receive
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between space-x-4">
+                  <div>
+                    <Label htmlFor="newLeads" className="text-base">New Leads</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get notified when new leads are added to your pipeline
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Select 
-                      value={companySettings?.timezone || "est"}
-                      onValueChange={(value) => handleCompanyChange("timezone", value)}
+                  <Switch 
+                    id="newLeads" 
+                    checked={notificationSettings?.new_leads || false}
+                    onCheckedChange={() => handleNotificationToggle("new_leads")}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between space-x-4">
+                  <div>
+                    <Label htmlFor="newBookings" className="text-base">New Bookings</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive notifications for new tour bookings
+                    </p>
+                  </div>
+                  <Switch 
+                    id="newBookings" 
+                    checked={notificationSettings?.new_bookings || false}
+                    onCheckedChange={() => handleNotificationToggle("new_bookings")}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between space-x-4">
+                  <div>
+                    <Label htmlFor="paymentReceipts" className="text-base">Payment Receipts</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get email receipts for all payment transactions
+                    </p>
+                  </div>
+                  <Switch 
+                    id="paymentReceipts" 
+                    checked={notificationSettings?.payment_receipts || false}
+                    onCheckedChange={() => handleNotificationToggle("payment_receipts")}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between space-x-4">
+                  <div>
+                    <Label htmlFor="remindersTour" className="text-base">Tour Reminders</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive reminders about upcoming tours
+                    </p>
+                  </div>
+                  <Switch 
+                    id="remindersTour" 
+                    checked={notificationSettings?.tour_reminders || false}
+                    onCheckedChange={() => handleNotificationToggle("tour_reminders")}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between space-x-4">
+                  <div>
+                    <Label htmlFor="marketingEmails" className="text-base">Marketing Emails</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive updates about new features and promotions
+                    </p>
+                  </div>
+                  <Switch 
+                    id="marketingEmails"
+                    checked={notificationSettings?.marketing_emails || false}
+                    onCheckedChange={() => handleNotificationToggle("marketing_emails")}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 backdrop-blur border-border/30">
+            <CardHeader>
+              <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Push Notifications</CardTitle>
+              <CardDescription>
+                Configure browser push notifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between space-x-4">
+                  <div>
+                    <Label htmlFor="pushNewLeads" className="text-base">New Leads</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get instant notifications for new leads
+                    </p>
+                  </div>
+                  <Switch 
+                    id="pushNewLeads" 
+                    checked={notificationSettings?.push_leads || false}
+                    onCheckedChange={() => handleNotificationToggle("push_leads")}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between space-x-4">
+                  <div>
+                    <Label htmlFor="pushNewBookings" className="text-base">New Bookings</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get instant notifications for new bookings
+                    </p>
+                  </div>
+                  <Switch 
+                    id="pushNewBookings" 
+                    checked={notificationSettings?.push_bookings || false}
+                    onCheckedChange={() => handleNotificationToggle("push_bookings")}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between space-x-4">
+                  <div>
+                    <Label htmlFor="pushPayments" className="text-base">Payment Received</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Get instant notifications for payments
+                    </p>
+                  </div>
+                  <Switch 
+                    id="pushPayments"
+                    checked={notificationSettings?.push_payments || false}
+                    onCheckedChange={() => handleNotificationToggle("push_payments")}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button 
+                onClick={saveNotificationSettingsHandler} 
+                disabled={saving}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  </>
+                ) : "Save Preferences"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        {/* Email Settings Tab */}
+        <TabsContent value="email" className="space-y-4">
+          <Card className="bg-card/50 backdrop-blur border-border/30">
+            <CardHeader>
+              <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Email Settings</CardTitle>
+              <CardDescription>
+                Configure SMTP settings to send emails from your application
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="smtpHost">SMTP Host</Label>
+                  <Input 
+                    id="smtpHost" 
+                    placeholder="mail.example.com"
+                    value={emailSettings.smtp_host} 
+                    onChange={(e) => handleEmailSettingsChange("smtp_host", e.target.value)}
+                    className="bg-background/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtpPort">SMTP Port</Label>
+                  <Input 
+                    id="smtpPort" 
+                    type="number"
+                    placeholder="587"
+                    value={emailSettings.smtp_port} 
+                    onChange={(e) => handleEmailSettingsChange("smtp_port", parseInt(e.target.value))}
+                    className="bg-background/50"
+                  />
+                  <p className="text-xs text-muted-foreground">Common ports: 25, 465 (SSL), 587 (TLS)</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="smtpUser">SMTP Username</Label>
+                  <Input 
+                    id="smtpUser" 
+                    placeholder="user@example.com"
+                    value={emailSettings.smtp_user} 
+                    onChange={(e) => handleEmailSettingsChange("smtp_user", e.target.value)}
+                    className="bg-background/50"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtpPassword">SMTP Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="smtpPassword" 
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={emailSettings.smtp_password} 
+                      onChange={(e) => handleEmailSettingsChange("smtp_password", e.target.value)}
+                      className="bg-background/50 pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3"
+                      onClick={() => setShowPassword(!showPassword)}
                     >
-                      <SelectTrigger id="timezone" className="bg-background/50">
-                        <SelectValue placeholder="Select timezone" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="est">Eastern Time (ET)</SelectItem>
-                        <SelectItem value="cst">Central Time (CT)</SelectItem>
-                        <SelectItem value="mst">Mountain Time (MT)</SelectItem>
-                        <SelectItem value="pst">Pacific Time (PT)</SelectItem>
-                        <SelectItem value="ist">India Standard Time (IST)</SelectItem>
-                        <SelectItem value="gmt">GMT/UTC</SelectItem>
-                        <SelectItem value="bst">British Summer Time (BST)</SelectItem>
-                        <SelectItem value="aest">Australian Eastern Time (AET)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                    </Button>
                   </div>
                 </div>
-              </CardContent>
-              <CardFooter className="justify-end">
-                <Button 
-                  onClick={saveCompanySettings} 
-                  disabled={saving}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                    </>
-                  ) : "Save Company Details"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
+              </div>
 
-          <TabsContent value="email" className="space-y-6">
-            <Card className="bg-card/50 backdrop-blur border-border/30">
-              <CardHeader>
-                <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Email Settings</CardTitle>
-                <CardDescription>
-                  Configure SMTP settings to send emails from your application
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpHost">SMTP Host</Label>
-                    <Input 
-                      id="smtpHost" 
-                      placeholder="mail.example.com"
-                      value={emailSettings.smtp_host} 
-                      onChange={(e) => handleEmailSettingsChange("smtp_host", e.target.value)}
-                      className="bg-background/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpPort">SMTP Port</Label>
-                    <Input 
-                      id="smtpPort" 
-                      type="number"
-                      placeholder="587"
-                      value={emailSettings.smtp_port} 
-                      onChange={(e) => handleEmailSettingsChange("smtp_port", parseInt(e.target.value))}
-                      className="bg-background/50"
-                    />
-                    <p className="text-xs text-muted-foreground">Common ports: 25, 465 (SSL), 587 (TLS)</p>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="senderName">Sender Name</Label>
+                  <Input 
+                    id="senderName" 
+                    placeholder="Your Company Name"
+                    value={emailSettings.sender_name} 
+                    onChange={(e) => handleEmailSettingsChange("sender_name", e.target.value)}
+                    className="bg-background/50"
+                  />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="senderEmail">Sender Email</Label>
+                  <Input 
+                    id="senderEmail" 
+                    type="email"
+                    placeholder="noreply@example.com"
+                    value={emailSettings.sender_email} 
+                    onChange={(e) => handleEmailSettingsChange("sender_email", e.target.value)}
+                    className="bg-background/50"
+                  />
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button 
+                onClick={testEmailSettingsHandler} 
+                variant="outline"
+                disabled={saving || testingEmail}
+              >
+                {testingEmail ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Testing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" /> Test Email
+                  </>
+                )}
+              </Button>
+              <Button 
+                onClick={saveEmailSettingsHandler} 
+                disabled={saving}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  </>
+                ) : "Save Settings"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpUser">SMTP Username</Label>
-                    <Input 
-                      id="smtpUser" 
-                      placeholder="user@example.com"
-                      value={emailSettings.smtp_user} 
-                      onChange={(e) => handleEmailSettingsChange("smtp_user", e.target.value)}
-                      className="bg-background/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpPassword">SMTP Password</Label>
-                    <div className="relative">
-                      <Input 
-                        id="smtpPassword" 
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={emailSettings.smtp_password} 
-                        onChange={(e) => handleEmailSettingsChange("smtp_password", e.target.value)}
-                        className="bg-background/50 pr-10"
+        {/* Terms & Conditions Tab */}
+        <TabsContent value="terms" className="space-y-4">
+          <Card className="bg-card/50 backdrop-blur border-border/30">
+            <CardHeader>
+              <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Terms & Conditions</CardTitle>
+              <CardDescription>
+                Manage inclusions, exclusions, and terms & conditions that will appear in customer PDFs
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Inclusions Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold">Inclusions</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addArrayItem(termsAndConditions.inclusions, (newArray) => 
+                      setTermsAndConditions({ ...termsAndConditions, inclusions: newArray })
+                    )}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Inclusion
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {termsAndConditions.inclusions.map((inclusion, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={inclusion}
+                        onChange={(e) => handleArrayItemChange(
+                          termsAndConditions.inclusions,
+                          index,
+                          e.target.value,
+                          (newArray) => setTermsAndConditions({ ...termsAndConditions, inclusions: newArray })
+                        )}
+                        placeholder="Enter inclusion point"
+                        className="bg-background/50"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowPassword(!showPassword)}
+                        onClick={() => removeArrayItem(
+                          termsAndConditions.inclusions,
+                          index,
+                          (newArray) => setTermsAndConditions({ ...termsAndConditions, inclusions: newArray })
+                        )}
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
+                  ))}
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="senderName">Sender Name</Label>
-                    <Input 
-                      id="senderName" 
-                      placeholder="Your Company Name"
-                      value={emailSettings.sender_name} 
-                      onChange={(e) => handleEmailSettingsChange("sender_name", e.target.value)}
-                      className="bg-background/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="senderEmail">Sender Email</Label>
-                    <Input 
-                      id="senderEmail" 
-                      type="email"
-                      placeholder="noreply@example.com"
-                      value={emailSettings.sender_email} 
-                      onChange={(e) => handleEmailSettingsChange("sender_email", e.target.value)}
-                      className="bg-background/50"
-                    />
-                  </div>
+              <Separator />
+
+              {/* Exclusions Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold">Exclusions</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addArrayItem(termsAndConditions.exclusions, (newArray) => 
+                      setTermsAndConditions({ ...termsAndConditions, exclusions: newArray })
+                    )}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Exclusion
+                  </Button>
                 </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button 
-                  onClick={testEmailSettingsHandler} 
-                  variant="outline"
-                  disabled={saving || testingEmail}
-                >
-                  {testingEmail ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Testing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" /> Test Email
-                    </>
-                  )}
-                </Button>
-                <Button 
-                  onClick={saveEmailSettingsHandler} 
-                  disabled={saving}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                    </>
-                  ) : "Save Settings"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-6">
-            <Card className="bg-card/50 backdrop-blur border-border/30">
-              <CardHeader>
-                <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Email Notifications</CardTitle>
-                <CardDescription>
-                  Choose what types of email notifications you want to receive
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between space-x-4">
-                    <div>
-                      <Label htmlFor="newLeads" className="text-base">New Leads</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Get notified when new leads are added to your pipeline
-                      </p>
-                    </div>
-                    <Switch 
-                      id="newLeads" 
-                      checked={notificationSettings?.new_leads || false}
-                      onCheckedChange={() => handleNotificationToggle("new_leads")}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between space-x-4">
-                    <div>
-                      <Label htmlFor="newBookings" className="text-base">New Bookings</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive notifications for new tour bookings
-                      </p>
-                    </div>
-                    <Switch 
-                      id="newBookings" 
-                      checked={notificationSettings?.new_bookings || false}
-                      onCheckedChange={() => handleNotificationToggle("new_bookings")}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between space-x-4">
-                    <div>
-                      <Label htmlFor="paymentReceipts" className="text-base">Payment Receipts</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Get email receipts for all payment transactions
-                      </p>
-                    </div>
-                    <Switch 
-                      id="paymentReceipts" 
-                      checked={notificationSettings?.payment_receipts || false}
-                      onCheckedChange={() => handleNotificationToggle("payment_receipts")}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between space-x-4">
-                    <div>
-                      <Label htmlFor="remindersTour" className="text-base">Tour Reminders</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive reminders about upcoming tours
-                      </p>
-                    </div>
-                    <Switch 
-                      id="remindersTour" 
-                      checked={notificationSettings?.tour_reminders || false}
-                      onCheckedChange={() => handleNotificationToggle("tour_reminders")}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between space-x-4">
-                    <div>
-                      <Label htmlFor="marketingEmails" className="text-base">Marketing Emails</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive updates about new features and promotions
-                      </p>
-                    </div>
-                    <Switch 
-                      id="marketingEmails"
-                      checked={notificationSettings?.marketing_emails || false}
-                      onCheckedChange={() => handleNotificationToggle("marketing_emails")}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card/50 backdrop-blur border-border/30">
-              <CardHeader>
-                <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Push Notifications</CardTitle>
-                <CardDescription>
-                  Configure browser push notifications
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between space-x-4">
-                    <div>
-                      <Label htmlFor="pushNewLeads" className="text-base">New Leads</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Get instant notifications for new leads
-                      </p>
-                    </div>
-                    <Switch 
-                      id="pushNewLeads" 
-                      checked={notificationSettings?.push_leads || false}
-                      onCheckedChange={() => handleNotificationToggle("push_leads")}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between space-x-4">
-                    <div>
-                      <Label htmlFor="pushNewBookings" className="text-base">New Bookings</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Get instant notifications for new bookings
-                      </p>
-                    </div>
-                    <Switch 
-                      id="pushNewBookings" 
-                      checked={notificationSettings?.push_bookings || false}
-                      onCheckedChange={() => handleNotificationToggle("push_bookings")}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between space-x-4">
-                    <div>
-                      <Label htmlFor="pushPayments" className="text-base">Payment Received</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Get instant notifications for payments
-                      </p>
-                    </div>
-                    <Switch 
-                      id="pushPayments"
-                      checked={notificationSettings?.push_payments || false}
-                      onCheckedChange={() => handleNotificationToggle("push_payments")}
-                      className="data-[state=checked]:bg-emerald-500"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="justify-end">
-                <Button 
-                  onClick={saveNotificationSettings} 
-                  disabled={saving}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                    </>
-                  ) : "Save Preferences"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="advanced" className="space-y-6">
-            <Card className="bg-card/50 backdrop-blur border-border/30">
-              <CardHeader>
-                <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">API Integration</CardTitle>
-                <CardDescription>
-                  Manage your API keys and integration settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-base">API Key</Label>
-                    <div className="flex gap-2">
-                      <div className="flex-1 relative">
-                        <Input
-                          value="••••••••••••••••••••••••••••••"
-                          readOnly
-                          className="bg-background/50 pr-24"
-                        />
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-xs hover:text-emerald-500"
-                          onClick={() => toast.success("API key copied to clipboard")}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        onClick={handleRegenerateApiKey}
-                        className="bg-background/50 hover:text-emerald-500"
-                      >
-                        <Key className="mr-2 h-4 w-4" />
-                        Regenerate
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Use this key to authenticate API requests from your applications
-                    </p>
-                  </div>
-
-                  <Separator className="my-6" />
-
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-base font-medium mb-1">Webhook Settings</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Configure webhook endpoints for real-time event notifications
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="webhookUrl">Webhook URL</Label>
-                      <Input 
-                        id="webhookUrl"
-                        placeholder="https://your-domain.com/webhook"
+                <div className="space-y-2">
+                  {termsAndConditions.exclusions.map((exclusion, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={exclusion}
+                        onChange={(e) => handleArrayItemChange(
+                          termsAndConditions.exclusions,
+                          index,
+                          e.target.value,
+                          (newArray) => setTermsAndConditions({ ...termsAndConditions, exclusions: newArray })
+                        )}
+                        placeholder="Enter exclusion point"
                         className="bg-background/50"
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeArrayItem(
+                          termsAndConditions.exclusions,
+                          index,
+                          (newArray) => setTermsAndConditions({ ...termsAndConditions, exclusions: newArray })
+                        )}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline" className="bg-background/50">
-                        New Leads
-                      </Badge>
-                      <Badge variant="outline" className="bg-background/50">
-                        Bookings
-                      </Badge>
-                      <Badge variant="outline" className="bg-background/50">
-                        Payments
-                      </Badge>
-                      <Badge variant="outline" className="bg-background/50">
-                        Tour Updates
-                      </Badge>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card className="bg-card/50 backdrop-blur border-border/30">
-              <CardHeader>
-                <CardTitle className="text-xl text-destructive">Danger Zone</CardTitle>
-                <CardDescription>
-                  Irreversible and destructive actions
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="rounded-lg border border-destructive/50 p-4 bg-destructive/5">
-                  <div className="flex items-start gap-4">
-                    <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-1" />
-                    <div className="space-y-2">
-                      <h3 className="font-medium">Delete Account</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Permanently delete your account and all associated data. This action cannot be undone.
-                      </p>
-                      <div className="pt-2">
-                        <Button 
-                          variant="destructive" 
-                          onClick={handleDeleteAccount} 
-                          disabled={saving}
-                        >
-                          {saving ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
-                            </>
-                          ) : "Delete Account"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+              <Separator />
+
+              {/* Terms & Conditions Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-lg font-semibold">Terms & Conditions</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addArrayItem(termsAndConditions.terms, (newArray) => 
+                      setTermsAndConditions({ ...termsAndConditions, terms: newArray })
+                    )}
+                  >
+                    <Plus className="h-4 w-4 mr-2" /> Add Term
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="space-y-2">
+                  {termsAndConditions.terms.map((term, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={term}
+                        onChange={(e) => handleArrayItemChange(
+                          termsAndConditions.terms,
+                          index,
+                          e.target.value,
+                          (newArray) => setTermsAndConditions({ ...termsAndConditions, terms: newArray })
+                        )}
+                        placeholder="Enter term or condition"
+                        className="bg-background/50"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeArrayItem(
+                          termsAndConditions.terms,
+                          index,
+                          (newArray) => setTermsAndConditions({ ...termsAndConditions, terms: newArray })
+                        )}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button 
+                onClick={saveTermsAndConditions} 
+                disabled={saving}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  </>
+                ) : "Save Terms & Conditions"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        {/* Users Management Tab (Admin Only) */}
+        {isAdmin && (
+          <TabsContent value="users" className="space-y-4">
+            <UserManagement />
           </TabsContent>
-        </div>
+        )}
+
+        {/* Permissions Tab (Admin Only) */}
+        {isAdmin && (
+          <TabsContent value="permissions" className="space-y-4">
+            <PermissionSettings />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

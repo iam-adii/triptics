@@ -26,8 +26,8 @@ import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().optional(),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
+  email: z.string().email("Invalid email address").optional().or(z.literal('')),
+  phone: z.string().min(1, "Phone number is required"),
   source: z.string().optional(),
   status: z.string().default("New"),
   notes: z.string().optional(),
@@ -59,13 +59,16 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
   async function onSubmit(values: FormValues) {
     setIsSubmitting(true);
     try {
+      // Normalize email - if it's empty string, set to null to handle database constraints better
+      const normalizedEmail = values.email?.trim() === '' ? null : values.email;
+      
       if (lead?.id) {
         // Update existing lead
         const { error } = await supabase
           .from("leads")
           .update({
             name: values.name,
-            email: values.email,
+            email: normalizedEmail,
             phone: values.phone,
             source: values.source,
             status: values.status,
@@ -80,7 +83,7 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
         // Create new lead
         const { error } = await supabase.from("leads").insert({
           name: values.name,
-          email: values.email,
+          email: normalizedEmail,
           phone: values.phone,
           source: values.source,
           status: values.status,
@@ -130,13 +133,13 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email *</FormLabel>
+                <FormLabel>Email</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder="Email address" 
                     {...field} 
-                    required 
                     className="bg-background"
+                    required={false}
                   />
                 </FormControl>
                 <FormMessage />
@@ -149,11 +152,12 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone</FormLabel>
+                <FormLabel>Phone *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder="Phone number" 
-                    {...field} 
+                    {...field}
+                    required
                     className="bg-background"
                   />
                 </FormControl>

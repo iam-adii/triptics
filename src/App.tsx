@@ -1,12 +1,15 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LoadingProvider } from "@/contexts/LoadingContext";
 import { CompanySettingsProvider } from "@/contexts/CompanySettingsContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { Layout } from "@/components/Layout";
 import { PageLoader } from "@/components/PageLoader";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Dashboard from "@/pages/Dashboard";
 import Leads from "@/pages/Leads";
 import Customers from "@/pages/Customers";
@@ -18,9 +21,12 @@ import Reports from "@/pages/Reports";
 import Calendar from "@/pages/Calendar";
 import Settings from "@/pages/Settings";
 import Transfers from "@/pages/Transfers";
+import TransferRoutes from "@/pages/TransferRoutes";
 import Hotels from "@/pages/Hotels";
 import NotFound from "@/pages/NotFound";
 import DataDebug from "@/pages/DataDebug";
+import Login from "@/pages/Login";
+import AccessDenied from "@/pages/AccessDenied";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -89,30 +95,42 @@ const App = () => (
           closeButton
         />
         <BrowserRouter>
-          <LoadingProvider>
-            <CompanySettingsProvider>
-              <PageLoader />
-              <SupabaseConnectionCheck />
-              <Routes>
-                <Route path="/" element={<Layout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="leads" element={<Leads />} />
-                  <Route path="customers" element={<Customers />} />
-                  <Route path="itineraries" element={<Itineraries />} />
-                  <Route path="itineraries/builder/:id" element={<ItineraryBuilder />} />
-                  <Route path="bookings" element={<Bookings />} />
-                  <Route path="payments" element={<Payments />} />
-                  <Route path="reports" element={<Reports />} />
-                  <Route path="calendar" element={<Calendar />} />
-                  <Route path="transfers" element={<Transfers />} />
-                  <Route path="hotels" element={<Hotels />} />
-                  <Route path="settings" element={<Settings />} />
-                  <Route path="debug" element={<DataDebug />} />
-                  <Route path="*" element={<NotFound />} />
-                </Route>
-              </Routes>
-            </CompanySettingsProvider>
-          </LoadingProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <LoadingProvider>
+                <CompanySettingsProvider>
+                  <PageLoader />
+                  <SupabaseConnectionCheck />
+                  <Routes>
+                    {/* Public routes */}
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/access-denied" element={<AccessDenied />} />
+                    
+                    {/* Protected routes */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route element={<Layout />}>
+                        <Route path="/" element={<ProtectedRoute pageId="dashboard"><Dashboard /></ProtectedRoute>} />
+                        <Route path="leads" element={<ProtectedRoute pageId="leads"><Leads /></ProtectedRoute>} />
+                        <Route path="customers" element={<ProtectedRoute pageId="customers"><Customers /></ProtectedRoute>} />
+                        <Route path="itineraries" element={<ProtectedRoute pageId="itineraries"><Itineraries /></ProtectedRoute>} />
+                        <Route path="itineraries/builder/:id" element={<ProtectedRoute pageId="itineraries"><ItineraryBuilder /></ProtectedRoute>} />
+                        <Route path="bookings" element={<ProtectedRoute pageId="bookings"><Bookings /></ProtectedRoute>} />
+                        <Route path="payments" element={<ProtectedRoute pageId="payments"><Payments /></ProtectedRoute>} />
+                        <Route path="reports" element={<ProtectedRoute pageId="reports"><Reports /></ProtectedRoute>} />
+                        <Route path="calendar" element={<ProtectedRoute pageId="calendar"><Calendar /></ProtectedRoute>} />
+                        <Route path="transfers" element={<ProtectedRoute pageId="transfers"><Transfers /></ProtectedRoute>} />
+                        <Route path="transfer-routes" element={<ProtectedRoute pageId="transfers"><TransferRoutes /></ProtectedRoute>} />
+                        <Route path="hotels" element={<ProtectedRoute pageId="hotels"><Hotels /></ProtectedRoute>} />
+                        <Route path="settings" element={<ProtectedRoute pageId="settings"><Settings /></ProtectedRoute>} />
+                        <Route path="debug" element={<ProtectedRoute pageId="dashboard"><DataDebug /></ProtectedRoute>} />
+                        <Route path="*" element={<NotFound />} />
+                      </Route>
+                    </Route>
+                  </Routes>
+                </CompanySettingsProvider>
+              </LoadingProvider>
+            </NotificationProvider>
+          </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

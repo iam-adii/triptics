@@ -23,10 +23,12 @@ export interface RoomRate {
   room_type: string;
   cp_rate: number; // Continental Plan
   map_rate: number; // Modified American Plan
+  ap_rate: number; // American Plan
   ep_rate: number; // European Plan
   extra_adult_rate: number;
   extra_child_rate: number;
   max_occupancy: number;
+  season_name?: string;
   season_start?: string;
   season_end?: string;
   is_active: boolean;

@@ -62,10 +62,12 @@ const roomRateSchema = z.object({
   room_type: z.string().min(2, "Room type is required"),
   cp_rate: z.coerce.number().min(0, "Rate must be a positive number"),
   map_rate: z.coerce.number().min(0, "Rate must be a positive number"),
+  ap_rate: z.coerce.number().min(0, "Rate must be a positive number"),
   ep_rate: z.coerce.number().min(0, "Rate must be a positive number"),
   extra_adult_rate: z.coerce.number().min(0, "Rate must be a positive number"),
   extra_child_rate: z.coerce.number().min(0, "Rate must be a positive number"),
   max_occupancy: z.coerce.number().min(1, "Occupancy must be at least 1"),
+  season_name: z.string().optional(),
   season_start: z.string().optional(),
   season_end: z.string().optional(),
   is_active: z.boolean().default(true),
@@ -113,10 +115,12 @@ export function HotelForm({ hotel, onClose }: HotelFormProps) {
       room_type: "",
       cp_rate: 0,
       map_rate: 0,
+      ap_rate: 0,
       ep_rate: 0,
       extra_adult_rate: 0,
       extra_child_rate: 0,
       max_occupancy: 2,
+      season_name: "",
       season_start: "",
       season_end: "",
       is_active: true,
@@ -198,10 +202,12 @@ export function HotelForm({ hotel, onClose }: HotelFormProps) {
         room_type: data.room_type,
         cp_rate: data.cp_rate,
         map_rate: data.map_rate,
+        ap_rate: data.ap_rate,
         ep_rate: data.ep_rate,
         extra_adult_rate: data.extra_adult_rate,
         extra_child_rate: data.extra_child_rate,
         max_occupancy: data.max_occupancy,
+        season_name: data.season_name,
         season_start: data.season_start,
         season_end: data.season_end,
         is_active: data.is_active,
@@ -221,10 +227,12 @@ export function HotelForm({ hotel, onClose }: HotelFormProps) {
         room_type: "",
         cp_rate: 0,
         map_rate: 0,
+        ap_rate: 0,
         ep_rate: 0,
         extra_adult_rate: 0,
         extra_child_rate: 0,
         max_occupancy: 2,
+        season_name: "",
         season_start: "",
         season_end: "",
         is_active: true,
@@ -578,6 +586,10 @@ export function HotelForm({ hotel, onClose }: HotelFormProps) {
                               <span className="font-medium">{formatCurrency(rate.map_rate)}</span>
                             </div>
                             <div>
+                              <span className="text-muted-foreground">AP Rate:</span>{" "}
+                              <span className="font-medium">{formatCurrency(rate.ap_rate)}</span>
+                            </div>
+                            <div>
                               <span className="text-muted-foreground">EP Rate:</span>{" "}
                               <span className="font-medium">{formatCurrency(rate.ep_rate)}</span>
                             </div>
@@ -591,9 +603,12 @@ export function HotelForm({ hotel, onClose }: HotelFormProps) {
                             </div>
                           </div>
                           
-                          {(rate.season_start || rate.season_end) && (
-                            <div className="mt-3 text-xs text-muted-foreground">
-                              Season: {rate.season_start || "Any"} to {rate.season_end || "Any"}
+                          {rate.season_name && (
+                            <div className="mt-3 text-sm bg-muted/50 px-2 py-1 rounded inline-flex items-center">
+                              <span className="font-medium">{rate.season_name}:</span>
+                              <span className="ml-1 text-xs text-muted-foreground">
+                                {rate.season_start || "Any"} to {rate.season_end || "Any"}
+                              </span>
                             </div>
                           )}
                         </CardContent>
@@ -639,7 +654,7 @@ export function HotelForm({ hotel, onClose }: HotelFormProps) {
                       />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <FormField
                         control={roomRateForm.control}
                         name="cp_rate"
@@ -672,6 +687,21 @@ export function HotelForm({ hotel, onClose }: HotelFormProps) {
                       
                       <FormField
                         control={roomRateForm.control}
+                        name="ap_rate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>AP Rate (₹)</FormLabel>
+                            <FormDescription className="text-xs">American Plan</FormDescription>
+                            <FormControl>
+                              <Input type="number" min="0" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={roomRateForm.control}
                         name="ep_rate"
                         render={({ field }) => (
                           <FormItem>
@@ -686,37 +716,24 @@ export function HotelForm({ hotel, onClose }: HotelFormProps) {
                       />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <FormField
                         control={roomRateForm.control}
-                        name="extra_adult_rate"
+                        name="season_name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Extra Adult Rate (₹)</FormLabel>
+                            <FormLabel>Season Name</FormLabel>
                             <FormControl>
-                              <Input type="number" min="0" {...field} />
+                              <Input placeholder="e.g. Peak Season, Off Season" {...field} />
                             </FormControl>
+                            <FormDescription className="text-xs">
+                              Give this season a descriptive name
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                       
-                      <FormField
-                        control={roomRateForm.control}
-                        name="extra_child_rate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Extra Child Rate (₹)</FormLabel>
-                            <FormControl>
-                              <Input type="number" min="0" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={roomRateForm.control}
                         name="season_start"

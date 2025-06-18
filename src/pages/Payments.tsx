@@ -60,8 +60,8 @@ interface Payment {
   payment_id: string;
   amount: number;
   status: string;
-  method: string;
-  date: string;
+  payment_method: string;
+  payment_date: string;
   payment_type?: string;
   notes?: string | null;
   bookings: Booking | null;
@@ -73,8 +73,8 @@ interface FormPayment {
   booking_id?: string;
   payment_id?: string;
   amount?: number;
-  method?: string;
-  date?: Date;
+  payment_method?: string;
+  payment_date?: Date;
   status?: string;
   payment_type?: string;
   notes?: string;
@@ -152,8 +152,8 @@ export default function Payments() {
           payment_id,
           amount,
           status,
-          method,
-          date,
+          payment_method,
+          payment_date,
           payment_type,
           notes,
           bookings (
@@ -188,7 +188,7 @@ export default function Payments() {
       
       // Get paginated data
       const { data, error } = await query
-        .order("date", { ascending: false })
+        .order("payment_date", { ascending: false })
         .range(from, to);
       
       if (error) throw error;
@@ -204,7 +204,7 @@ export default function Payments() {
           const toDate = new Date(dateRange.to);
           toDate.setHours(23, 59, 59, 999);
           filteredData = filteredData.filter(p => {
-            const paymentDate = new Date(p.date);
+            const paymentDate = new Date(p.payment_date);
             return paymentDate >= fromDate && paymentDate <= toDate;
           });
         }
@@ -270,15 +270,15 @@ export default function Payments() {
 
   const handleEditPayment = (payment: Payment) => {
     // Convert string date to Date object for the form
-    const paymentDate = payment.date ? new Date(payment.date) : new Date();
+    const paymentDate = payment.payment_date ? new Date(payment.payment_date) : new Date();
     
     const formattedPayment: FormPayment = {
       id: payment.id,
       booking_id: payment.bookings?.id,
       payment_id: payment.payment_id,
       amount: payment.amount,
-      method: payment.method,
-      date: paymentDate,
+      payment_method: payment.payment_method,
+      payment_date: paymentDate,
       status: payment.status,
       payment_type: payment.payment_type,
       notes: payment.notes
@@ -474,52 +474,12 @@ export default function Payments() {
     setIsReceiptViewerOpen(true);
   };
 
-  // Handle sending payment receipt
-  const handleSendReceipt = () => {
-    if (!viewPayment) return;
-    
-    // First check if the email server is running
-    import('@/services/emailService').then(({ checkEmailServer }) => {
-      checkEmailServer().then(isRunning => {
-        if (!isRunning) {
-          toast.error(
-            'Email server is not running. Please start the server first.',
-            {
-              description: 'Run "cd server && npm run dev" in a terminal to start the email server.',
-              duration: 5000,
-              action: {
-                label: 'Dismiss',
-                onClick: () => {}
-              }
-            }
-          );
-          return;
-        }
-        
-        // Check if customer email exists
-        if (!viewPayment.bookings?.customers?.email) {
-          // Prompt the user to enter a recipient email
-          const recipientEmail = prompt("No customer email found. Please enter a recipient email address:");
-          
-          if (!recipientEmail) {
-            toast.error("Email sending cancelled");
-            return;
-          }
-          
-          // Validate email format
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(recipientEmail)) {
-            toast.error("Invalid email format");
-            return;
-          }
-          
-          // Send with provided email
-          shareReceiptViaEmail(viewPayment, recipientEmail);
-        } else {
-          // Use the customer's email
-          shareReceiptViaEmail(viewPayment);
-        }
-      });
+  // Handle sending receipt via email
+  const handleSendReceipt = (payment: Payment) => {
+    // Use the shared function to handle email sending
+    shareReceiptViaEmail({
+      ...payment,
+      payment_id: payment.payment_id || `PAY-${payment.id.slice(-6)}`
     });
   };
 
@@ -729,9 +689,9 @@ export default function Payments() {
                       {payment.status}
                     </span>
                   </TableCell>
-                  <TableCell>{payment.method}</TableCell>
+                  <TableCell>{payment.payment_method}</TableCell>
                   <TableCell>{payment.payment_type || "Full"}</TableCell>
-                  <TableCell>{formatDate(payment.date)}</TableCell>
+                  <TableCell>{formatDate(payment.payment_date)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center gap-1 justify-end">
                       <Button 
@@ -751,14 +711,11 @@ export default function Payments() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleEditPayment(payment)}>View/Edit Payment</DropdownMenuItem>
-                          <DropdownMenuItem>Send Receipt</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleSendReceipt(payment)}>Send Receipt</DropdownMenuItem>
                           {payment.status === "Pending" && (
                             <DropdownMenuItem onClick={() => handleMarkAsCompleted(payment.id)}>
                               Mark as Completed
                             </DropdownMenuItem>
-                          )}
-                          {payment.status === "Completed" && (
-                            <DropdownMenuItem className="text-red-500">Issue Refund</DropdownMenuItem>
                           )}
                           <DropdownMenuItem 
                             className="text-red-500"
@@ -816,9 +773,9 @@ export default function Payments() {
                 </div>
                 <div className="p-4 flex justify-between items-center text-sm">
                   <div>
-                    <p className="text-muted-foreground">Method: {payment.method}</p>
+                    <p className="text-muted-foreground">Method: {payment.payment_method}</p>
                     <p className="text-muted-foreground">Type: {payment.payment_type || "Full"}</p>
-                    <p className="text-muted-foreground">Date: {formatDate(payment.date)}</p>
+                    <p className="text-muted-foreground">Date: {formatDate(payment.payment_date)}</p>
                   </div>
                   <div className="flex items-center gap-1">
                     <Button 
@@ -837,14 +794,11 @@ export default function Payments() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEditPayment(payment)}>View/Edit Payment</DropdownMenuItem>
-                        <DropdownMenuItem>Send Receipt</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleSendReceipt(payment)}>Send Receipt</DropdownMenuItem>
                         {payment.status === "Pending" && (
                           <DropdownMenuItem onClick={() => handleMarkAsCompleted(payment.id)}>
                             Mark as Completed
                           </DropdownMenuItem>
-                        )}
-                        {payment.status === "Completed" && (
-                          <DropdownMenuItem className="text-red-500">Issue Refund</DropdownMenuItem>
                         )}
                         <DropdownMenuItem 
                           className="text-red-500"
@@ -925,7 +879,7 @@ export default function Payments() {
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Date</div>
-                <div>{formatDate(viewPayment.date)}</div>
+                <div>{formatDate(viewPayment.payment_date)}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Amount</div>
@@ -933,7 +887,7 @@ export default function Payments() {
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Method</div>
-                <div>{viewPayment.method}</div>
+                <div>{viewPayment.payment_method}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Payment Type</div>
@@ -988,7 +942,7 @@ export default function Payments() {
               <Button
                 variant="outline"
                 className="flex items-center gap-2"
-                onClick={handleSendReceipt}
+                onClick={() => handleSendReceipt(viewPayment)}
               >
                 <Mail className="h-4 w-4" /> Send Receipt
               </Button>
@@ -1005,7 +959,7 @@ export default function Payments() {
               <div className="flex justify-between">
                 <div className="text-sm font-medium">Transaction Details</div>
                 <div className="text-sm text-muted-foreground">
-                  Updated: {format(parseISO(viewPayment.date), "PPpp")}
+                  Updated: {format(parseISO(viewPayment.payment_date), "PPpp")}
                 </div>
               </div>
               <div className="mt-2 p-3 bg-muted/50 rounded-md">

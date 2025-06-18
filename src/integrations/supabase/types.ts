@@ -120,6 +120,15 @@ export interface CompanySettings {
   updated_at?: string;
 }
 
+export interface TermsAndConditions {
+  id: string;
+  inclusions: string[];
+  exclusions: string[];
+  terms: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 // Mock Database type definition
 export type Database = {
   public: {
@@ -168,6 +177,11 @@ export type Database = {
         Row: CompanySettings;
         Insert: Partial<CompanySettings>;
         Update: Partial<CompanySettings>;
+      };
+      terms_and_conditions: {
+        Row: TermsAndConditions;
+        Insert: Partial<TermsAndConditions>;
+        Update: Partial<TermsAndConditions>;
       };
     };
   };

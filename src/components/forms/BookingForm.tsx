@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   customer_id: z.string().min(1, "Customer is required"),
-  tour_id: z.string().min(1, "Tour is required"),
+  itinerary_id: z.string().min(1, "Itinerary is required"),
   start_date: z.date({ required_error: "Start date is required" }),
   end_date: z.date({ required_error: "End date is required" }),
   status: z.string().default("Pending"),
@@ -52,14 +52,14 @@ export interface BookingFormProps {
 
 export function BookingForm({ booking, onSuccess, onCancel }: BookingFormProps) {
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
-  const [tours, setTours] = useState<{ id: string; name: string; price: number; location: string }[]>([]);
+  const [itineraries, setItineraries] = useState<{ id: string; name: string; destination: string; budget: number }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       customer_id: booking?.customer_id || "",
-      tour_id: booking?.tour_id || "",
+      itinerary_id: booking?.itinerary_id || "",
       start_date: booking?.start_date ? new Date(booking.start_date) : new Date(),
       end_date: booking?.end_date ? new Date(booking.end_date) : new Date(),
       status: booking?.status || "Pending",
@@ -68,7 +68,7 @@ export function BookingForm({ booking, onSuccess, onCancel }: BookingFormProps) 
     },
   });
 
-  // Fetch customers and tours on component mount
+  // Fetch customers and itineraries on component mount
   useEffect(() => {
     async function fetchData() {
       setIsLoading(true);
@@ -82,20 +82,20 @@ export function BookingForm({ booking, onSuccess, onCancel }: BookingFormProps) 
         if (customersError) throw customersError;
         if (customersData) setCustomers(customersData);
 
-        // Fetch tours
-        const { data: toursData, error: toursError } = await supabase
-          .from("tours")
-          .select("id, name, price, location")
+        // Fetch itineraries instead of tours
+        const { data: itinerariesData, error: itinerariesError } = await supabase
+          .from("itineraries")
+          .select("id, name, destination, budget")
           .order("name");
 
-        if (toursError) throw toursError;
-        if (toursData) setTours(toursData);
+        if (itinerariesError) throw itinerariesError;
+        if (itinerariesData) setItineraries(itinerariesData);
         
-        // If we have a booking with a tour_id, set the total_amount based on the tour price
-        if (booking?.tour_id) {
-          const selectedTour = toursData?.find(tour => tour.id === booking.tour_id);
-          if (selectedTour && !booking.total_amount) {
-            form.setValue("total_amount", selectedTour.price);
+        // If we have a booking with an itinerary_id, set the total_amount based on the itinerary budget
+        if (booking?.itinerary_id) {
+          const selectedItinerary = itinerariesData?.find(itinerary => itinerary.id === booking.itinerary_id);
+          if (selectedItinerary && !booking.total_amount && selectedItinerary.budget) {
+            form.setValue("total_amount", selectedItinerary.budget);
           }
         }
       } catch (error) {
@@ -107,14 +107,14 @@ export function BookingForm({ booking, onSuccess, onCancel }: BookingFormProps) 
     }
 
     fetchData();
-  }, [booking?.tour_id, form]);
+  }, [booking?.itinerary_id, form]);
 
-  // Set tour price when tour is selected
-  const handleTourChange = (tourId: string) => {
-    form.setValue("tour_id", tourId);
-    const selectedTour = tours.find(tour => tour.id === tourId);
-    if (selectedTour) {
-      form.setValue("total_amount", selectedTour.price);
+  // Set itinerary budget as price when itinerary is selected
+  const handleItineraryChange = (itineraryId: string) => {
+    form.setValue("itinerary_id", itineraryId);
+    const selectedItinerary = itineraries.find(itinerary => itinerary.id === itineraryId);
+    if (selectedItinerary && selectedItinerary.budget) {
+      form.setValue("total_amount", selectedItinerary.budget);
     }
   };
 
@@ -124,7 +124,7 @@ export function BookingForm({ booking, onSuccess, onCancel }: BookingFormProps) 
       
       const bookingData = {
         customer_id: values.customer_id,
-        tour_id: values.tour_id,
+        itinerary_id: values.itinerary_id,
         start_date: format(values.start_date, 'yyyy-MM-dd'),
         end_date: format(values.end_date, 'yyyy-MM-dd'),
         status: values.status,
@@ -226,26 +226,26 @@ export function BookingForm({ booking, onSuccess, onCancel }: BookingFormProps) 
 
         <FormField
           control={form.control}
-          name="tour_id"
+          name="itinerary_id"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Tour *</FormLabel>
+              <FormLabel>Itinerary *</FormLabel>
               <Select 
-                onValueChange={handleTourChange}
+                onValueChange={handleItineraryChange}
                 defaultValue={field.value}
               >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select tour" />
+                    <SelectValue placeholder="Select itinerary" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {tours.length === 0 ? (
-                    <SelectItem value="no-tours" disabled>No tours found</SelectItem>
+                  {itineraries.length === 0 ? (
+                    <SelectItem value="no-itineraries" disabled>No itineraries found</SelectItem>
                   ) : (
-                    tours.map(tour => (
-                      <SelectItem key={tour.id} value={tour.id}>
-                        {tour.name} - {tour.location} - ₹{tour.price.toLocaleString()}
+                    itineraries.map(itinerary => (
+                      <SelectItem key={itinerary.id} value={itinerary.id}>
+                        {itinerary.name} - {itinerary.destination} {itinerary.budget ? `- ₹${itinerary.budget.toLocaleString()}` : ''}
                       </SelectItem>
                     ))
                   )}

@@ -24,13 +24,12 @@ interface Payment {
   payment_id: string;
   amount: number;
   status: string;
-  method: string;
-  date: string;
+  payment_method: string;
+  payment_date: string;
   payment_type?: string;
   notes?: string;
   bookings?: Booking | null;
   currency?: string;
-  payment_date?: string;
 }
 
 interface ReceiptPDFProps {
@@ -74,24 +73,10 @@ const ReceiptPDF: React.FC<ReceiptPDFProps> = ({
 let cachedCompanySettings: any = null;
 
 const fetchCompanySettings = async () => {
-  if (cachedCompanySettings) {
-    return cachedCompanySettings;
-  }
-  
   try {
-    const { supabase } = await import('@/integrations/supabase/client');
-    const { data, error } = await supabase
-      .from("company_settings")
-      .select("*")
-      .single();
-      
-    if (error && error.code !== "PGRST116") {
-      throw error;
-    }
-    
-    // Cache the result
-    cachedCompanySettings = data;
-    return data;
+    const { getCompanySettings } = await import('@/utils/pdf');
+    // Always force refresh to get the latest settings
+    return await getCompanySettings(true);
   } catch (error) {
     console.error("Error fetching company settings:", error);
     return null;
@@ -139,7 +124,7 @@ const generatePDFBuffer = async (payment: Payment, companySettings: any): Promis
 // A standalone function to share the receipt via email
 export function shareReceiptViaEmail(payment: Payment, recipientEmail?: string) {
   // Get company settings
-  return fetchCompanySettings().then(async companySettings => {
+  return fetchCompanySettings().then(async (companySettings) => {
     try {
       const recipient = recipientEmail || payment.bookings?.customers?.email;
       
@@ -169,7 +154,7 @@ export function shareReceiptViaEmail(payment: Payment, recipientEmail?: string) 
         const paymentDetails = {
           paymentId: payment.payment_id,
           amount: `${payment.currency || 'INR'} ${payment.amount.toFixed(2)}`,
-          date: new Date(payment.payment_date || payment.date).toLocaleDateString()
+          date: new Date(payment.payment_date).toLocaleDateString()
         };
         
         // Send email with PDF attachment

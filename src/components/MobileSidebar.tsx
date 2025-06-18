@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "./ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 
 type NavigationItemProps = {
   to: string;
@@ -28,6 +29,7 @@ type NavigationItemProps = {
   label: string;
   onClose: () => void;
   badge?: string;
+  pageId: string;
 };
 
 const NavigationItem: React.FC<NavigationItemProps> = ({ 
@@ -35,8 +37,16 @@ const NavigationItem: React.FC<NavigationItemProps> = ({
   icon, 
   label, 
   onClose,
-  badge 
+  badge,
+  pageId
 }) => {
+  const { hasPermission } = useAuth();
+  
+  // Don't render the navigation item if the user doesn't have permission
+  if (!hasPermission(pageId)) {
+    return null;
+  }
+  
   return (
     <NavLink
       to={to}
@@ -64,63 +74,86 @@ const NavigationItem: React.FC<NavigationItemProps> = ({
 export function MobileSidebar() {
   const [open, setOpen] = useState(false);
   const handleClose = () => setOpen(false);
+  const { isAuthenticated } = useAuth();
+  
+  // If not authenticated, don't render the sidebar
+  if (!isAuthenticated) {
+    return null;
+  }
 
   // Define navigation items
   const navigationItems = [
     { 
       to: "/", 
       icon: <LayoutDashboard className="w-full h-full" />, 
-      label: "Dashboard"
+      label: "Dashboard",
+      pageId: "dashboard"
     },
     { 
       to: "/leads", 
       icon: <User className="w-full h-full" />, 
-      label: "Leads"
+      label: "Leads",
+      pageId: "leads"
     },
     { 
       to: "/customers", 
       icon: <Users className="w-full h-full" />, 
-      label: "Customers"
+      label: "Customers",
+      pageId: "customers"
     },
     { 
       to: "/itineraries", 
       icon: <Map className="w-full h-full" />, 
-      label: "Itineraries"
+      label: "Itineraries",
+      pageId: "itineraries"
     },
     { 
       to: "/bookings", 
       icon: <Package className="w-full h-full" />, 
-      label: "Bookings"
+      label: "Bookings",
+      pageId: "bookings"
     },
     { 
       to: "/payments", 
       icon: <CreditCard className="w-full h-full" />, 
-      label: "Payments"
+      label: "Payments",
+      pageId: "payments"
     },
     { 
       to: "/transfers", 
       icon: <Car className="w-full h-full" />, 
-      label: "Transfers"
+      label: "Transfers",
+      pageId: "transfers"
+    },
+    { 
+      to: "/transfer-routes", 
+      icon: <Map className="w-full h-full" />, 
+      label: "Transfer Routes",
+      pageId: "transfers"
     },
     { 
       to: "/hotels", 
       icon: <Building2 className="w-full h-full" />, 
-      label: "Hotels"
+      label: "Hotels",
+      pageId: "hotels"
     },
     { 
       to: "/reports", 
       icon: <BarChart4 className="w-full h-full" />, 
-      label: "Reports"
+      label: "Reports",
+      pageId: "reports"
     },
     { 
       to: "/calendar", 
       icon: <Calendar className="w-full h-full" />, 
-      label: "Calendar"
+      label: "Calendar",
+      pageId: "calendar"
     },
     { 
       to: "/settings", 
       icon: <Settings className="w-full h-full" />, 
-      label: "Settings"
+      label: "Settings",
+      pageId: "settings"
     },
   ];
 
@@ -176,6 +209,7 @@ export function MobileSidebar() {
               icon={item.icon}
               label={item.label}
               onClose={handleClose}
+              pageId={item.pageId}
             />
           ))}
         </nav>

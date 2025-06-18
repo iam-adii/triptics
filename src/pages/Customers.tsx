@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Loader2, MoreHorizontal, Pencil, Trash2, CalendarRange, ArrowUpDown, ArrowUp, ArrowDown, Eye, UserPlus } from "lucide-react";
+import { Search, Loader2, MoreHorizontal, Pencil, Trash2, CalendarRange, ArrowUpDown, ArrowUp, ArrowDown, Eye, UserPlus, Users } from "lucide-react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { CustomerForm } from "@/components/forms/CustomerForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,8 @@ interface Customer {
   total_spent: number;
   created_at: string;
   updated_at: string;
+  adults?: number;
+  children?: number;
 }
 
 export default function Customers() {
@@ -612,6 +614,27 @@ export default function Customers() {
                   <p className="mt-1">
                     {new Date(selectedCustomer.created_at).toLocaleDateString()}
                   </p>
+                </div>
+              </div>
+              
+              {/* Travel Group Details */}
+              <div className="border p-4 rounded-md bg-gray-50 dark:bg-gray-900">
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Users className="h-4 w-4 text-emerald-600" />
+                  Travel Group Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <h5 className="text-xs font-medium text-muted-foreground">Adults</h5>
+                    <p className="mt-1">{selectedCustomer.adults || 0}</p>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-medium text-muted-foreground">Children</h5>
+                    <p className="mt-1">{selectedCustomer.children || 0}</p>
+                  </div>
+                  <div className="sm:col-span-2 text-xs text-muted-foreground">
+                    Total travelers: {(selectedCustomer.adults || 0) + (selectedCustomer.children || 0)}
+                  </div>
                 </div>
               </div>
               

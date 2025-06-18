@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Itinerary } from "@/types/itinerary";
 
@@ -8,7 +7,9 @@ export const fetchItineraries = async (): Promise<Itinerary[]> => {
     .from("itineraries")
     .select(`
       *,
-      customers:client_id (name)
+      customers:client_id (id, name, email, phone),
+      customer_email,
+      customer_phone
     `)
     .order("created_at", { ascending: false });
 

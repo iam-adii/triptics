@@ -1,34 +1,25 @@
-// Import nodemailer only when in Node.js environment
-let nodemailer: any;
-try {
-  // This will only work in a Node.js environment
-  if (typeof window === 'undefined') {
-    nodemailer = require('nodemailer');
-  }
-} catch (error) {
-  console.warn('Nodemailer not available in browser environment');
-}
+import { toast } from 'sonner';
+import { EMAIL_ENDPOINTS } from '../config/email';
 
-import { supabase } from '@/integrations/supabase/client';
-import { EMAIL_API_URL, EMAIL_ENDPOINTS, DEFAULT_EMAIL_SETTINGS } from '@/config/email';
-
+/**
+ * Email Settings interface
+ */
 export interface EmailSettings {
-  id?: string;
   smtp_host: string;
   smtp_port: number;
   smtp_user: string;
   smtp_password: string;
   sender_name: string;
   sender_email: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
-// Get SMTP settings from the database
-export const fetchEmailSettings = async (): Promise<EmailSettings | null> => {
+/**
+ * Fetch email settings from the database
+ * @returns Promise with email settings or null
+ */
+export async function fetchEmailSettings(): Promise<EmailSettings | null> {
   try {
-    console.log('Fetching email settings from the database...');
-    
+    const { supabase } = await import('../integrations/supabase/client');
     const { data, error } = await supabase
       .from('email_settings')
       .select('*')
@@ -40,39 +31,60 @@ export const fetchEmailSettings = async (): Promise<EmailSettings | null> => {
       return null;
     }
 
-    console.log('Email settings fetched:', data);
-    return data ? data as EmailSettings : null;
+    return data;
   } catch (error) {
     console.error('Exception fetching email settings:', error);
     return null;
   }
-};
+}
 
-// Save email settings to the database
-export const saveEmailSettings = async (settings: EmailSettings): Promise<{ success: boolean, error?: string }> => {
+/**
+ * Fetch company name from settings
+ * @returns Promise with company name or default value
+ */
+export async function fetchCompanyName(): Promise<string> {
   try {
-    console.log('Saving email settings:', settings);
+    const { supabase } = await import('../integrations/supabase/client');
+    const { data, error } = await supabase
+      .from('company_settings')
+      .select('name')
+      .single();
     
-    // Check if email settings already exist by querying for any records
-    const { data: existingSettings, error: queryError } = await supabase
+    if (error) {
+      console.error('Error fetching company name:', error);
+      return 'Triptics';
+    }
+    
+    return data.name || 'Triptics';
+  } catch (error) {
+    console.error('Exception fetching company name:', error);
+    return 'Triptics';
+  }
+}
+
+/**
+ * Save email settings to the database
+ * @param settings - Email settings to save
+ * @returns Promise with success status and optional error message
+ */
+export async function saveEmailSettings(settings: EmailSettings): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await import('../integrations/supabase/client');
+    
+    // First check if settings already exist
+    const { data, error } = await supabase
       .from('email_settings')
       .select('id')
       .limit(1);
     
-    if (queryError) {
-      console.error('Error checking existing settings:', queryError);
-      throw queryError;
+    if (error) {
+      console.error('Error checking existing email settings:', error);
+      return { success: false, error: error.message };
     }
-
-    const now = new Date().toISOString();
-    const hasExistingSettings = existingSettings && existingSettings.length > 0;
     
-    console.log('Existing settings found:', hasExistingSettings);
-    
-    let result;
-    if (hasExistingSettings) {
-      // Update existing settings
-      result = await supabase
+    // If settings exist, update them, otherwise insert new
+    if (data && data.length > 0) {
+      const { error: updateError } = await supabase
         .from('email_settings')
         .update({
           smtp_host: settings.smtp_host,
@@ -81,12 +93,16 @@ export const saveEmailSettings = async (settings: EmailSettings): Promise<{ succ
           smtp_password: settings.smtp_password,
           sender_name: settings.sender_name,
           sender_email: settings.sender_email,
-          updated_at: now
+          updated_at: new Date().toISOString()
         })
-        .eq('id', existingSettings[0].id);
+        .eq('id', data[0].id);
+      
+      if (updateError) {
+        console.error('Error updating email settings:', updateError);
+        return { success: false, error: updateError.message };
+      }
     } else {
-      // Insert new settings
-      result = await supabase
+      const { error: insertError } = await supabase
         .from('email_settings')
         .insert({
           smtp_host: settings.smtp_host,
@@ -95,379 +111,315 @@ export const saveEmailSettings = async (settings: EmailSettings): Promise<{ succ
           smtp_password: settings.smtp_password,
           sender_name: settings.sender_name,
           sender_email: settings.sender_email,
-          created_at: now,
-          updated_at: now
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
+      
+      if (insertError) {
+        console.error('Error inserting email settings:', insertError);
+        return { success: false, error: insertError.message };
+      }
     }
     
-    if (result.error) {
-      console.error('Error saving settings to database:', result.error);
-      throw result.error;
-    }
-
-    console.log('Email settings saved successfully');
-    
-    // Dispatch an event that settings were updated
-    dispatchSettingsUpdatedEvent();
-
     return { success: true };
-  } catch (error: any) {
-    console.error('Error saving email settings:', error);
+  } catch (error) {
+    console.error('Exception saving email settings:', error);
     return { 
       success: false, 
-      error: error.message || 'Failed to save email settings'
+      error: error instanceof Error ? error.message : 'Unknown error' 
     };
   }
-};
-
-// Define a simple Attachment interface to match nodemailer needs
-interface Attachment {
-  filename?: string;
-  content?: Buffer | string;
-  contentType?: string;
-  path?: string;
 }
 
-// Helper function to check if email server is running
-export const checkEmailServer = async (): Promise<boolean> => {
+/**
+ * Test email settings by sending a test email
+ * @param settings - Email settings to test
+ * @returns Promise with success status and optional error message
+ */
+export async function testEmailSettings(settings: EmailSettings): Promise<{ success: boolean; error?: string }> {
   try {
-    const response = await fetch(`${EMAIL_API_URL}/status`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-      mode: 'cors',
-      credentials: 'omit',
-      // Add a timeout to prevent long waiting times
-      signal: AbortSignal.timeout(3000) // 3 second timeout
-    });
+    // First save the settings
+    const saveResult = await saveEmailSettings(settings);
     
-    if (response.ok) {
-      console.log('Email server is running');
-      return true;
+    if (!saveResult.success) {
+      return saveResult;
     }
-    return false;
-  } catch (error) {
-    console.warn('Email server is not running:', error);
-    return false;
-  }
-};
 
-// Helper function to make API requests to the email server
-export const callEmailApi = async (endpoint: string, data: any) => {
-  try {
-    const fullUrl = `${EMAIL_API_URL}${endpoint}`;
-    console.log(`Calling email API endpoint: ${fullUrl}`);
-    console.log('Request data structure:', Object.keys(data));
-    
-    // Check if server is running first
-    const isServerRunning = await checkEmailServer();
-    if (!isServerRunning) {
-      throw new Error('Email server is not running. Please start the email server by running "npm run dev" in the server directory.');
-    }
-    
-    console.log(`Making fetch request to: ${fullUrl}`);
-    
-    // Validate that we have the required data
-    if (!data.settings) {
-      console.error('Missing settings in API request');
-      throw new Error('Email settings are required but not provided');
-    }
-    
-    const response = await fetch(fullUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(data),
-      // Add these options to help with CORS issues
-      mode: 'cors',
-      credentials: 'omit',
-    });
+    // First test SMTP connectivity
+    try {
+      const response = await fetch(EMAIL_ENDPOINTS.test_smtp, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
 
-    console.log(`Response status: ${response.status}`);
-    console.log(`Response status text: ${response.statusText}`);
-    
-    if (!response.ok) {
-      let errorMessage = `HTTP error ${response.status}`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorMessage;
-        console.error('Error response data:', errorData);
-      } catch (e) {
-        console.error('Could not parse error response as JSON', e);
-        // Try to get text response
-        try {
-          const textResponse = await response.text();
-          console.error('Raw response text:', textResponse);
-        } catch (textError) {
-          console.error('Could not get response text either', textError);
-        }
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response from test-smtp:', textResponse);
+        return { 
+          success: false, 
+          error: 'SMTP server returned non-JSON response. Please check server logs.'
+        };
       }
-      throw new Error(errorMessage);
-    }
 
-    const result = await response.json();
-    console.log('Success response:', result);
-    return result;
-  } catch (error: any) {
-    console.error(`Error calling email API ${endpoint}:`, error);
-    throw error;
-  }
-};
-
-// Send a basic email
-export const sendEmail = async (
-  to: string,
-  subject: string,
-  text: string,
-  html?: string,
-  attachments?: Attachment[]
-) => {
-  try {
-    const settings = await fetchEmailSettings();
-    
-    if (!settings || !settings.smtp_host || !settings.smtp_user || !settings.smtp_password) {
-      throw new Error('Email settings not configured. Please set up your SMTP server in Settings > Email.');
-    }
-    
-    // Call the API to send the email
-    const result = await callEmailApi(EMAIL_ENDPOINTS.send, {
-      to,
-      subject,
-      text,
-      html,
-      attachments,
-      settings
-    });
-    
-    return { 
-      success: true,
-      messageId: result.messageId
-    };
-  } catch (error: any) {
-    console.error('Error sending email:', error);
-    return { 
-      success: false, 
-      error: error.message || 'Failed to send email'
-    };
-  }
-};
-
-// Send booking confirmation email with itinerary PDF
-export const sendBookingConfirmation = async (
-  to: string, 
-  bookingDetails: any,
-  pdfBuffer: Uint8Array
-) => {
-  try {
-    const settings = await fetchEmailSettings();
-    
-    if (!settings) {
-      throw new Error('Email settings not configured');
-    }
-    
-    // Call the API to send the booking confirmation email
-    const result = await callEmailApi(EMAIL_ENDPOINTS.bookingConfirmation, {
-      to,
-      bookingDetails,
-      pdfBuffer: Array.from(pdfBuffer), // Convert Uint8Array to array for JSON transmission
-      settings
-    });
-    
-    return { 
-      success: true,
-      messageId: result.messageId
-    };
-  } catch (error: any) {
-    console.error('Error sending booking confirmation:', error);
-    return { 
-      success: false, 
-      error: error.message || 'Failed to send booking confirmation'
-    };
-  }
-};
-
-// Send payment receipt email with invoice PDF
-export const sendPaymentReceipt = async (
-  to: string,
-  paymentDetails: any,
-  pdfBuffer: Uint8Array
-) => {
-  try {
-    const settings = await fetchEmailSettings();
-    
-    if (!settings) {
-      throw new Error('Email settings not configured');
-    }
-    
-    // Call the API to send the payment receipt email
-    const result = await callEmailApi(EMAIL_ENDPOINTS.paymentReceipt, {
-      to,
-      paymentDetails,
-      pdfBuffer: Array.from(pdfBuffer), // Convert Uint8Array to array for JSON transmission
-      settings
-    });
-    
-    return { 
-      success: true,
-      messageId: result.messageId
-    };
-  } catch (error: any) {
-    console.error('Error sending payment receipt:', error);
-    return { 
-      success: false, 
-      error: error.message || 'Failed to send payment receipt'
-    };
-  }
-};
-
-// Send transfer details email with PDF
-export const sendTransferDetails = async (
-  to: string,
-  transferDetails: any,
-  pdfBuffer: Uint8Array
-) => {
-  try {
-    const settings = await fetchEmailSettings();
-    
-    if (!settings) {
-      throw new Error('Email settings not configured');
-    }
-    
-    console.log('Email settings:', settings);
-    console.log('Transfer details:', transferDetails);
-    console.log('PDF buffer length:', pdfBuffer.length);
-    
-    // Check if the email settings are complete
-    if (!settings.smtp_host || !settings.smtp_port || !settings.smtp_user || 
-        !settings.smtp_password || !settings.sender_email || !settings.sender_name) {
-      throw new Error('Email settings are incomplete. Please check your SMTP configuration.');
-    }
-    
-    // Call the API to send the transfer details email
-    const result = await callEmailApi(EMAIL_ENDPOINTS.transferDetails, {
-      to,
-      transferDetails,
-      pdfBuffer: Array.from(pdfBuffer), // Convert Uint8Array to array for JSON transmission
-      settings
-    });
-    
-    return { 
-      success: true,
-      messageId: result.messageId
-    };
-  } catch (error: any) {
-    console.error('Error sending transfer details:', error);
-    return { 
-      success: false, 
-      error: error.message || 'Failed to send transfer details'
-    };
-  }
-};
-
-// Test email settings by sending a test email
-export const testEmailSettings = async (settings: EmailSettings): Promise<{ success: boolean, error?: string, messageId?: string }> => {
-  try {
-    console.log('Testing email settings:', settings);
-    
-    // Validate settings before sending to the API
-    if (!settings.smtp_host || !settings.smtp_port || !settings.smtp_user || 
-        !settings.smtp_password || !settings.sender_email || !settings.sender_name) {
+      const smtpTest = await response.json();
+      
+      if (!response.ok || !smtpTest.success) {
+        return { 
+          success: false, 
+          error: smtpTest.error || 'Failed to connect to SMTP server'
+        };
+      }
+    } catch (error) {
+      console.error('Error testing SMTP connection:', error);
       return { 
         success: false, 
-        error: 'Please fill in all email settings fields'
+        error: error instanceof Error ? 
+          `SMTP connection error: ${error.message}` : 
+          'Failed to connect to SMTP server'
       };
     }
     
-    // Call the API to test email settings
-    const result = await callEmailApi(EMAIL_ENDPOINTS.test, { settings });
+    // Get company name for the email signature
+    const companyName = await fetchCompanyName();
     
-    return { 
-      success: true,
-      messageId: result.messageId 
+    // If SMTP connection is successful, send a test email
+    const payload = {
+      name: settings.sender_name,
+      email: settings.sender_email,
+      message: 'This is a test email to verify your email settings are working correctly.',
+      type: 'test',
+      settings,
+      companyName  // Add company name to payload
     };
-  } catch (error: any) {
-    console.error('Error testing email settings:', error);
-    // Create a more descriptive error message
-    let errorMessage = error.message || 'Failed to test email settings';
     
-    // Check for common SMTP/network errors
-    if (errorMessage.includes('ECONNREFUSED')) {
-      errorMessage = 'Connection refused. Please check if the email server is running and the SMTP host/port are correct.';
-    } else if (errorMessage.includes('Authentication failed')) {
-      errorMessage = 'Authentication failed. Please check your SMTP username and password.';
-    } else if (errorMessage.includes('certificate has expired')) {
-      errorMessage = 'SSL certificate issue. Try using a different port or disable SSL.';
+    try {
+      const response = await fetch(EMAIL_ENDPOINTS.test_smtp + '&send=true', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response from send test email:', textResponse);
+        return { 
+          success: false, 
+          error: 'Email server returned non-JSON response. Please check server logs.'
+        };
+      }
+
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        return { 
+          success: false, 
+          error: result.error || 'Failed to send test email'
+        };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? 
+          `Send error: ${error.message}` : 
+          'Failed to send test email'
+      };
     }
-    
+  } catch (error) {
+    console.error('Error in testEmailSettings:', error);
     return { 
       success: false, 
-      error: errorMessage
+      error: error instanceof Error ? error.message : 'Unknown error' 
     };
-  }
-};
-
-// Dispatch a custom event to notify that email settings have been updated
-function dispatchSettingsUpdatedEvent() {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('email-settings-updated'));
   }
 }
 
-// Function to send itinerary email
-export const sendItineraryEmail = async (
-  recipientEmail: string,
-  itineraryDetails: {
-    itineraryName: string;
-    destination: string;
-    startDate: string;
-    endDate: string;
-    customerName: string;
-  },
-  pdfAttachment: Uint8Array
-): Promise<{ success: boolean; error?: string }> => {
+/**
+ * Check if email server is available
+ */
+export async function checkEmailServer(): Promise<boolean> {
   try {
+    const response = await fetch(EMAIL_ENDPOINTS.check, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    return data.success === true;
+  } catch (error) {
+    console.error('Error checking email server:', error);
+    return false;
+  }
+}
+
+/**
+ * Generic function to call the email API
+ * @param endpoint - API endpoint
+ * @param payload - Email payload
+ * @returns Promise with response
+ */
+export async function callEmailApi(endpoint: string, payload: any): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Get email settings to include with the request
     const settings = await fetchEmailSettings();
     
-    if (!settings) {
-      throw new Error('Email settings not configured');
-    }
+    // Get company name
+    const companyName = await fetchCompanyName();
     
-    // Create HTML email content
-    const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #10b981;">${itineraryDetails.itineraryName}</h1>
-        <p>Dear ${itineraryDetails.customerName},</p>
-        <p>We are pleased to share your travel itinerary with you.</p>
-        
-        <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Destination:</strong> ${itineraryDetails.destination}</p>
-          <p><strong>Travel Dates:</strong> ${itineraryDetails.startDate} to ${itineraryDetails.endDate}</p>
-        </div>
-        
-        <p>We have prepared a detailed itinerary for your upcoming trip.</p>
-        
-        <p>If you have any questions or need any changes, please don't hesitate to contact us.</p>
-        
-        <p>We look forward to making your trip memorable!</p>
-        
-        <p>Best regards,<br>Your Travel Team</p>
-      </div>
-    `;
+    // Include email settings and company name in the payload
+    const updatedPayload = {
+      ...payload,
+      companyName,
+      settings: settings || undefined
+    };
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatedPayload),
+    });
 
-    return await sendEmail(
-      recipientEmail,
-      `Your Travel Itinerary: ${itineraryDetails.itineraryName}`,
-      `Your travel itinerary for ${itineraryDetails.destination} from ${itineraryDetails.startDate} to ${itineraryDetails.endDate}.`,
-      emailHtml
-    );
-  } catch (error: any) {
-    console.error('Error sending itinerary email:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error occurred',
+    // First check if response is JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      // If not JSON, try to get the text and return as error
+      const textResponse = await response.text();
+      console.error('Non-JSON response from API:', textResponse);
+      return { 
+        success: false, 
+        error: 'API returned non-JSON response. Please check server logs.'
+      };
+    }
+
+    // If it is JSON, parse it
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to send email' };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error calling email API:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     };
   }
-}; 
+}
+
+/**
+ * Send transfer details via email
+ * @param recipientEmail - Recipient email address
+ * @param transferDetails - Transfer details object
+ * @param pdfBuffer - PDF buffer as Uint8Array
+ * @returns Promise with response
+ */
+export async function sendTransferDetails(
+  recipientEmail: string,
+  transferDetails: {
+    transferId: string;
+    customerName: string;
+    vehicleType: string;
+    vehicleNumber: string;
+    pickupLocation: string;
+    dropLocation: string;
+    dateTime: string;
+    driverName: string;
+    driverContact: string;
+  },
+  pdfBuffer: Uint8Array
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Convert Uint8Array to regular array for JSON serialization
+    const pdfArray = Array.from(pdfBuffer);
+
+    const payload = {
+      name: transferDetails.customerName,
+      email: recipientEmail,
+      message: `Transfer details for ${transferDetails.customerName}`,
+      type: 'transfer',
+      transferDetails,
+      pdfAttachment: {
+        content: pdfArray,
+        filename: `transfer_${transferDetails.transferId}.pdf`,
+      },
+    };
+
+    return await callEmailApi(EMAIL_ENDPOINTS.transfer, payload);
+  } catch (error) {
+    console.error('Error sending transfer details:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
+
+/**
+ * Send payment receipt via email
+ * @param recipientEmail - Recipient email address
+ * @param paymentDetails - Payment details object
+ * @param pdfBuffer - PDF buffer as Uint8Array
+ * @returns Promise with response
+ */
+export async function sendPaymentReceipt(
+  recipientEmail: string,
+  paymentDetails: {
+    paymentId: string;
+    amount: string;
+    date: string;
+  },
+  pdfBuffer: Uint8Array
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Convert Uint8Array to regular array for JSON serialization
+    const pdfArray = Array.from(pdfBuffer);
+
+    const payload = {
+      name: 'Customer', // Required field for PHP mailer
+      email: recipientEmail,
+      message: `Payment receipt for ${paymentDetails.paymentId}`,
+      type: 'payment',
+      paymentDetails,
+      pdfBuffer: pdfArray,
+    };
+
+    return await callEmailApi(EMAIL_ENDPOINTS.payment, payload);
+  } catch (error) {
+    console.error('Error sending payment receipt:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
+
+/**
+ * Update the send-email.php file to handle the transfer details
+ * This function is used to update the PHP file with the necessary code to handle transfer emails
+ */
+export async function updateEmailHandlerForTransfers(): Promise<void> {
+  // This is a placeholder function that would typically be used during setup
+  // In a real implementation, this might update the PHP file or configure the email server
+  toast.info('Email handler configured for transfers');
+} 

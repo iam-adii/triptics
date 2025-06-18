@@ -1,6 +1,16 @@
-# Triptics Email Server
+# Triptics API Server
 
-This is a simple Express server that handles email sending for the Triptics application using nodemailer with cPanel SMTP settings.
+This is a comprehensive Node.js API server for the Triptics application, providing authentication, email services, and more.
+
+## Features
+
+- User authentication with JWT
+- Email sending with SMTP
+- Supabase integration
+- Rate limiting
+- Error handling
+- Security features (CORS, Helmet)
+- TypeScript support
 
 ## Setup
 
@@ -14,65 +24,89 @@ This is a simple Express server that handles email sending for the Triptics appl
    ```
    # Server configuration
    PORT=3001
+   NODE_ENV=development
 
    # CORS settings
-   CORS_ORIGIN=http://localhost:8080
+   CORS_ORIGIN=http://localhost:5173
+
+   # JWT Secret
+   JWT_SECRET=your-secret-key-change-in-production
+
+   # Supabase configuration
+   SUPABASE_URL=https://your-project-url.supabase.co
+   SUPABASE_KEY=your-supabase-anon-key
    ```
 
-3. Start the server:
+3. Build the TypeScript code:
    ```
-   npm run dev
+   npm run build
+   ```
+
+4. Start the server:
+   ```
+   npm run dev   # For development with auto-reload
+   npm start     # For production
    ```
 
 ## API Endpoints
 
-### Test Server
-- `GET /api/status` - Check if the server is running
+### Authentication
+- `POST /api/auth/login` - Login with email and password
+- `POST /api/auth/register` - Register a new user
+- `GET /api/auth/profile` - Get current user profile (requires authentication)
 
 ### Email Operations
+- `GET /api/email/status` - Check if the server is running
 - `POST /api/email/test` - Test email settings
 - `POST /api/email/send` - Send a basic email
 - `POST /api/email/booking-confirmation` - Send a booking confirmation email with PDF attachment
-- `POST /api/email/payment-receipt` - Send a payment receipt email with PDF attachment
+- `GET /api/email/settings` - Get email settings (requires authentication)
+- `POST /api/email/settings` - Save email settings (requires authentication)
 
-## cPanel SMTP Configuration
+## Supabase Integration
 
-To use cPanel SMTP with this server, you need to provide the following SMTP settings in your requests:
+This server integrates with Supabase for:
+1. User authentication
+2. Data storage
+3. Email settings management
 
-```json
-{
-  "settings": {
-    "smtp_host": "mail.yourdomain.com",
-    "smtp_port": 587,
-    "smtp_user": "noreply@yourdomain.com",
-    "smtp_password": "your-secure-password",
-    "sender_name": "Your Company Name",
-    "sender_email": "noreply@yourdomain.com"
-  }
-}
+Make sure to set up the following tables in your Supabase project:
+
+### Email Settings Table
+```sql
+CREATE TABLE email_settings (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  smtp_host TEXT NOT NULL,
+  smtp_port INTEGER NOT NULL,
+  smtp_user TEXT NOT NULL,
+  smtp_password TEXT NOT NULL,
+  sender_name TEXT NOT NULL,
+  sender_email TEXT NOT NULL,
+  secure_token TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 ```
-
-These settings are stored in the Supabase database and can be configured through the Triptics application settings page.
 
 ## Deployment
 
 For production deployment, consider the following:
 
-1. Use environment variables for configuration
-2. Set up HTTPS for secure communication
-3. Implement rate limiting to prevent abuse
-4. Add authentication for API endpoints
-5. Consider using a process manager like PM2 to keep the server running
+1. Set NODE_ENV=production in your environment
+2. Use a process manager like PM2 to keep the server running
+3. Set up HTTPS for secure communication
+4. Use a strong JWT secret
+5. Configure proper CORS settings
 
 Example PM2 configuration:
 ```
-pm2 start index.js --name "triptics-email-server"
+pm2 start dist/index.js --name "triptics-api"
 ```
 
 ## Security Considerations
 
-- This server handles sensitive email credentials, ensure it's properly secured
-- All communication should be over HTTPS in production
-- Implement proper authentication for API access
-- Store sensitive data like SMTP passwords securely
-- Validate all incoming requests thoroughly 
+- All API endpoints are rate-limited to prevent abuse
+- Authentication is required for sensitive operations
+- CORS is configured to restrict access to allowed origins
+- Helmet is used to set security headers
+- Error messages are sanitized in production mode 
