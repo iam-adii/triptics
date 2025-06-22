@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { WhatsAppShare } from '@/components/WhatsAppShare';
 import { Share } from 'lucide-react';
 import { useCompanySettings } from '@/contexts/CompanySettingsContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SendItineraryViaWhatsAppProps {
   itinerary: any;
@@ -9,6 +10,13 @@ interface SendItineraryViaWhatsAppProps {
   size?: 'default' | 'sm' | 'lg';
   variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive';
   buttonText?: string;
+}
+
+// Add interface for Terms & Conditions
+interface TermsAndConditions {
+  inclusions: string[];
+  exclusions: string[];
+  terms: string[];
 }
 
 export function SendItineraryViaWhatsApp({
@@ -23,6 +31,42 @@ export function SendItineraryViaWhatsApp({
   // Get company settings
   const { companySettings } = useCompanySettings();
   const companyName = companySettings?.name || 'Triptics';
+
+  // Add state for terms and conditions
+  const [termsAndConditions, setTermsAndConditions] = useState<TermsAndConditions>({
+    inclusions: [],
+    exclusions: [],
+    terms: []
+  });
+
+  // Fetch terms and conditions from database
+  useEffect(() => {
+    const fetchTermsAndConditions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('terms_and_conditions')
+          .select('*')
+          .single();
+
+        if (error) {
+          console.log('No terms and conditions found');
+          return;
+        }
+
+        if (data) {
+          setTermsAndConditions({
+            inclusions: data.inclusions || [],
+            exclusions: data.exclusions || [],
+            terms: data.terms || []
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching terms and conditions:', error);
+      }
+    };
+
+    fetchTermsAndConditions();
+  }, []);
 
   // Format date for WhatsApp
   const formatDate = (dateString: string) => {
@@ -80,28 +124,41 @@ export function SendItineraryViaWhatsApp({
       message += `${itinerary.notes}\n`;
     }
     
-    // Add inclusions if available
-    if (itinerary.inclusions) {
+    // Add inclusions from database if available
+    if (termsAndConditions.inclusions.length > 0) {
       message += `\n*INCLUSIONS:*\n`;
-      const inclusionItems = itinerary.inclusions.split('\n')
-        .filter((item: string) => item.trim() !== '')
-        .map((item: string) => `+ ${item.trim()}`);
-      message += inclusionItems.join('\n');
+      termsAndConditions.inclusions.forEach(inclusion => {
+        if (inclusion.trim()) {
+          message += `+ ${inclusion.trim()}\n`;
+        }
+      });
       message += '\n';
     }
     
-    // Add exclusions if available
-    if (itinerary.exclusions) {
-      message += `\n*EXCLUSIONS:*\n`;
-      const exclusionItems = itinerary.exclusions.split('\n')
-        .filter((item: string) => item.trim() !== '')
-        .map((item: string) => `- ${item.trim()}`);
-      message += exclusionItems.join('\n');
+    // Add exclusions from database if available
+    if (termsAndConditions.exclusions.length > 0) {
+      message += `*EXCLUSIONS:*\n`;
+      termsAndConditions.exclusions.forEach(exclusion => {
+        if (exclusion.trim()) {
+          message += `- ${exclusion.trim()}\n`;
+        }
+      });
+      message += '\n';
+    }
+    
+    // Add terms and conditions from database if available
+    if (termsAndConditions.terms.length > 0) {
+      message += `*TERMS & CONDITIONS:*\n`;
+      termsAndConditions.terms.forEach((term, index) => {
+        if (term.trim()) {
+          message += `${index + 1}. ${term.trim()}\n`;
+        }
+      });
       message += '\n';
     }
     
     // Call to action
-    message += `\n------------------\n`;
+    message += `------------------\n`;
     message += `We would be happy to adjust this itinerary according to your preferences. Please let us know if you would like any modifications or have questions about the proposed plan.\n\n`;
     message += `*Best regards,*\n*${companyName}*`;
     

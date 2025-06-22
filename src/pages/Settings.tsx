@@ -801,29 +801,74 @@ export default function Settings() {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          // No record found, create default
+          // No record found, create default with empty arrays
+          console.log('No terms and conditions found, creating default...');
           const defaultTerms = {
-            inclusions: [''],
-            exclusions: [''],
-            terms: ['']
+            inclusions: [],
+            exclusions: [],
+            terms: []
           };
-          const { data: newData, error: insertError } = await supabase
-            .from('terms_and_conditions')
-            .insert(defaultTerms)
-            .select()
-            .single();
+          
+          try {
+            const { data: newData, error: insertError } = await supabase
+              .from('terms_and_conditions')
+              .insert(defaultTerms)
+              .select()
+              .single();
 
-          if (insertError) throw insertError;
-          setTermsAndConditions(newData);
+            if (insertError) {
+              console.error('Error creating default terms:', insertError);
+              // If insert fails, just set the default state
+              setTermsAndConditions({
+                id: '',
+                inclusions: [''],
+                exclusions: [''],
+                terms: [''],
+                created_at: '',
+                updated_at: ''
+              });
+            } else {
+              setTermsAndConditions({
+                ...newData,
+                inclusions: newData.inclusions && newData.inclusions.length > 0 ? newData.inclusions : [''],
+                exclusions: newData.exclusions && newData.exclusions.length > 0 ? newData.exclusions : [''],
+                terms: newData.terms && newData.terms.length > 0 ? newData.terms : ['']
+              });
+            }
+          } catch (insertError) {
+            console.error('Error creating default terms:', insertError);
+            // If insert fails, just set the default state
+            setTermsAndConditions({
+              id: '',
+              inclusions: [''],
+              exclusions: [''],
+              terms: [''],
+              created_at: '',
+              updated_at: ''
+            });
+          }
         } else {
           throw error;
         }
       } else {
-        setTermsAndConditions(data);
+        setTermsAndConditions({
+          ...data,
+          inclusions: data.inclusions && data.inclusions.length > 0 ? data.inclusions : [''],
+          exclusions: data.exclusions && data.exclusions.length > 0 ? data.exclusions : [''],
+          terms: data.terms && data.terms.length > 0 ? data.terms : ['']
+        });
       }
     } catch (error: any) {
       console.error('Error fetching terms and conditions:', error);
-      toast.error('Failed to load terms and conditions');
+      // Set default state instead of showing error to user
+      setTermsAndConditions({
+        id: '',
+        inclusions: [''],
+        exclusions: [''],
+        terms: [''],
+        created_at: '',
+        updated_at: ''
+      });
     }
   };
 
@@ -1344,29 +1389,40 @@ export default function Settings() {
             <CardHeader>
               <CardTitle className="text-xl text-emerald-600 dark:text-emerald-500">Terms & Conditions</CardTitle>
               <CardDescription>
-                Manage inclusions, exclusions, and terms & conditions that will appear in customer PDFs
+                Manage inclusions, exclusions, and terms & conditions that will appear in itinerary PDFs, previews, and WhatsApp messages
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-8">
               {/* Inclusions Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-lg font-semibold">Inclusions</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addArrayItem(termsAndConditions.inclusions, (newArray) => 
-                      setTermsAndConditions({ ...termsAndConditions, inclusions: newArray })
-                    )}
-                  >
-                    <Plus className="h-4 w-4 mr-2" /> Add Inclusion
-                  </Button>
-                </div>
-                <div className="space-y-2">
+              <Card className="border-emerald-200 dark:border-emerald-800">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg text-emerald-700 dark:text-emerald-300">✓ Inclusions</CardTitle>
+                      <CardDescription className="text-sm">
+                        Services and amenities included in your travel packages
+                      </CardDescription>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addArrayItem(termsAndConditions.inclusions, (newArray) => 
+                        setTermsAndConditions({ ...termsAndConditions, inclusions: newArray })
+                      )}
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300"
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Add Inclusion
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
                   {termsAndConditions.inclusions.map((inclusion, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
+                    <div key={index} className="flex gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center mt-1">
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}</span>
+                      </div>
+                      <Textarea
                         value={inclusion}
                         onChange={(e) => handleArrayItemChange(
                           termsAndConditions.inclusions,
@@ -1374,8 +1430,9 @@ export default function Settings() {
                           e.target.value,
                           (newArray) => setTermsAndConditions({ ...termsAndConditions, inclusions: newArray })
                         )}
-                        placeholder="Enter inclusion point"
-                        className="bg-background/50"
+                        placeholder="Enter what's included in your package (e.g., Accommodation, Meals, Transportation, etc.)"
+                        className="bg-background/50 min-h-[60px] resize-none"
+                        rows={2}
                       />
                       <Button
                         type="button"
@@ -1386,35 +1443,51 @@ export default function Settings() {
                           index,
                           (newArray) => setTermsAndConditions({ ...termsAndConditions, inclusions: newArray })
                         )}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex-shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
-                </div>
-              </div>
-
-              <Separator />
+                  {termsAndConditions.inclusions.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Plus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No inclusions added yet. Click "Add Inclusion" to get started.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Exclusions Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-lg font-semibold">Exclusions</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addArrayItem(termsAndConditions.exclusions, (newArray) => 
-                      setTermsAndConditions({ ...termsAndConditions, exclusions: newArray })
-                    )}
-                  >
-                    <Plus className="h-4 w-4 mr-2" /> Add Exclusion
-                  </Button>
-                </div>
-                <div className="space-y-2">
+              <Card className="border-red-200 dark:border-red-800">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg text-red-700 dark:text-red-300">✗ Exclusions</CardTitle>
+                      <CardDescription className="text-sm">
+                        Services and costs not included in your travel packages
+                      </CardDescription>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addArrayItem(termsAndConditions.exclusions, (newArray) => 
+                        setTermsAndConditions({ ...termsAndConditions, exclusions: newArray })
+                      )}
+                      className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300"
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Add Exclusion
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
                   {termsAndConditions.exclusions.map((exclusion, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
+                    <div key={index} className="flex gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mt-1">
+                        <span className="text-xs text-red-600 dark:text-red-400 font-medium">{index + 1}</span>
+                      </div>
+                      <Textarea
                         value={exclusion}
                         onChange={(e) => handleArrayItemChange(
                           termsAndConditions.exclusions,
@@ -1422,8 +1495,9 @@ export default function Settings() {
                           e.target.value,
                           (newArray) => setTermsAndConditions({ ...termsAndConditions, exclusions: newArray })
                         )}
-                        placeholder="Enter exclusion point"
-                        className="bg-background/50"
+                        placeholder="Enter what's not included (e.g., Personal expenses, Travel insurance, Tips, etc.)"
+                        className="bg-background/50 min-h-[60px] resize-none"
+                        rows={2}
                       />
                       <Button
                         type="button"
@@ -1434,35 +1508,51 @@ export default function Settings() {
                           index,
                           (newArray) => setTermsAndConditions({ ...termsAndConditions, exclusions: newArray })
                         )}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex-shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
-                </div>
-              </div>
-
-              <Separator />
+                  {termsAndConditions.exclusions.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Plus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No exclusions added yet. Click "Add Exclusion" to get started.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Terms & Conditions Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-lg font-semibold">Terms & Conditions</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => addArrayItem(termsAndConditions.terms, (newArray) => 
-                      setTermsAndConditions({ ...termsAndConditions, terms: newArray })
-                    )}
-                  >
-                    <Plus className="h-4 w-4 mr-2" /> Add Term
-                  </Button>
-                </div>
-                <div className="space-y-2">
+              <Card className="border-blue-200 dark:border-blue-800">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg text-blue-700 dark:text-blue-300">📋 Terms & Conditions</CardTitle>
+                      <CardDescription className="text-sm">
+                        Important policies, conditions, and legal terms for your customers
+                      </CardDescription>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addArrayItem(termsAndConditions.terms, (newArray) => 
+                        setTermsAndConditions({ ...termsAndConditions, terms: newArray })
+                      )}
+                      className="border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300"
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Add Term
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
                   {termsAndConditions.terms.map((term, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
+                    <div key={index} className="flex gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mt-1">
+                        <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">{index + 1}</span>
+                      </div>
+                      <Textarea
                         value={term}
                         onChange={(e) => handleArrayItemChange(
                           termsAndConditions.terms,
@@ -1470,8 +1560,9 @@ export default function Settings() {
                           e.target.value,
                           (newArray) => setTermsAndConditions({ ...termsAndConditions, terms: newArray })
                         )}
-                        placeholder="Enter term or condition"
-                        className="bg-background/50"
+                        placeholder="Enter terms and conditions (e.g., Cancellation policy, Payment terms, Liability clauses, etc.)"
+                        className="bg-background/50 min-h-[80px] resize-none"
+                        rows={3}
                       />
                       <Button
                         type="button"
@@ -1482,13 +1573,86 @@ export default function Settings() {
                           index,
                           (newArray) => setTermsAndConditions({ ...termsAndConditions, terms: newArray })
                         )}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex-shrink-0"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
-                </div>
-              </div>
+                  {termsAndConditions.terms.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Plus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p>No terms added yet. Click "Add Term" to get started.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Quick Templates Section */}
+              <Card className="border-gray-200 dark:border-gray-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-gray-700 dark:text-gray-300">🚀 Quick Templates</CardTitle>
+                  <CardDescription className="text-sm">
+                    Add common travel industry terms quickly
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="font-medium">Common Inclusions</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          "Accommodation as per itinerary",
+                          "Daily breakfast",
+                          "All transfers and sightseeing by private vehicle",
+                          "English speaking driver",
+                          "Toll taxes and parking charges"
+                        ].map((template, index) => (
+                          <Button
+                            key={index}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => {
+                              const newInclusions = [...termsAndConditions.inclusions, template];
+                              setTermsAndConditions({ ...termsAndConditions, inclusions: newInclusions });
+                            }}
+                          >
+                            + {template}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-medium">Common Exclusions</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          "Airfare/train fare",
+                          "Personal expenses",
+                          "Travel insurance",
+                          "Tips and gratuities",
+                          "Any meals not mentioned in inclusions"
+                        ].map((template, index) => (
+                          <Button
+                            key={index}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => {
+                              const newExclusions = [...termsAndConditions.exclusions, template];
+                              setTermsAndConditions({ ...termsAndConditions, exclusions: newExclusions });
+                            }}
+                          >
+                            + {template}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </CardContent>
             <CardFooter className="justify-end">
               <Button 

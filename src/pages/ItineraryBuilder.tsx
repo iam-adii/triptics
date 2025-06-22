@@ -12,6 +12,7 @@ import ItineraryPDF from "@/components/itinerary/ItineraryPDF";
 import { useCompanySettings } from "@/contexts/CompanySettingsContext";
 import SendItineraryEmailButton from "@/components/itinerary/SendItineraryEmailButton";
 import ShareViaWhatsAppButton from "@/components/itinerary/ShareViaWhatsAppButton";
+import { TermsConditionsSection } from "@/components/itinerary/TermsConditionsSection";
 
 // Import WhatsApp icon
 const WhatsAppIcon = () => (
@@ -760,6 +761,9 @@ export default function ItineraryBuilderPage() {
                 );
               })}
             </div>
+            
+            {/* Add Terms & Conditions Section above pricing summary */}
+            <TermsConditionsSection />
             
             {/* Add pricing summary to preview */}
             <div className="mt-8 border-t pt-6">

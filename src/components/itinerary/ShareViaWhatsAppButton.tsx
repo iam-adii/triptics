@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, ButtonProps } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Share2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ShareViaWhatsAppButtonProps extends ButtonProps {
   itinerary: any;
@@ -9,6 +10,13 @@ interface ShareViaWhatsAppButtonProps extends ButtonProps {
   activities: any[];
   buttonText?: string;
   pricingOptions?: any;
+}
+
+// Add interface for Terms & Conditions
+interface TermsAndConditions {
+  inclusions: string[];
+  exclusions: string[];
+  terms: string[];
 }
 
 const ShareViaWhatsAppButton: React.FC<ShareViaWhatsAppButtonProps> = ({
@@ -19,6 +27,41 @@ const ShareViaWhatsAppButton: React.FC<ShareViaWhatsAppButtonProps> = ({
   pricingOptions,
   ...props
 }) => {
+  // Add state for terms and conditions
+  const [termsAndConditions, setTermsAndConditions] = useState<TermsAndConditions>({
+    inclusions: [],
+    exclusions: [],
+    terms: []
+  });
+
+  // Fetch terms and conditions from database
+  useEffect(() => {
+    const fetchTermsAndConditions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('terms_and_conditions')
+          .select('*')
+          .single();
+
+        if (error) {
+          console.log('No terms and conditions found');
+          return;
+        }
+
+        if (data) {
+          setTermsAndConditions({
+            inclusions: data.inclusions || [],
+            exclusions: data.exclusions || [],
+            terms: data.terms || []
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching terms and conditions:', error);
+      }
+    };
+
+    fetchTermsAndConditions();
+  }, []);
   // Format date for WhatsApp
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -221,6 +264,36 @@ const ShareViaWhatsAppButton: React.FC<ShareViaWhatsAppButtonProps> = ({
         "Total";
       
       message += `\n*${priceLabel}: ₹${displayTotal.toFixed(showPerPerson ? 0 : 2)}*\n`;
+    }
+    
+    // Add inclusions from database if available
+    if (termsAndConditions.inclusions.length > 0) {
+      message += `\n*INCLUSIONS:*\n`;
+      termsAndConditions.inclusions.forEach(inclusion => {
+        if (inclusion.trim()) {
+          message += `+ ${inclusion.trim()}\n`;
+        }
+      });
+    }
+    
+    // Add exclusions from database if available
+    if (termsAndConditions.exclusions.length > 0) {
+      message += `\n*EXCLUSIONS:*\n`;
+      termsAndConditions.exclusions.forEach(exclusion => {
+        if (exclusion.trim()) {
+          message += `- ${exclusion.trim()}\n`;
+        }
+      });
+    }
+    
+    // Add terms and conditions from database if available
+    if (termsAndConditions.terms.length > 0) {
+      message += `\n*TERMS & CONDITIONS:*\n`;
+      termsAndConditions.terms.forEach((term, index) => {
+        if (term.trim()) {
+          message += `${index + 1}. ${term.trim()}\n`;
+        }
+      });
     }
     
     // Add footer

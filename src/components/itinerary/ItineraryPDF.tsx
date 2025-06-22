@@ -25,219 +25,292 @@ const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#fff',
-    padding: 30,
+    padding: 20,
     fontFamily: 'Roboto',
+    fontSize: 8,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 15,
     paddingBottom: 10,
     borderBottom: '1 solid #e5e7eb',
   },
   companyHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottom: '1 solid #f3f4f6',
   },
   companyInfo: {
     flex: 1,
   },
   companyLogo: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
     objectFit: 'contain',
   },
   companyName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#10b981',
+    marginBottom: 2,
   },
   companyContact: {
-    fontSize: 8,
+    fontSize: 7,
     color: '#6b7280',
-    marginTop: 2,
+    marginBottom: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 4,
     color: '#111827',
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#4b5563',
-    marginBottom: 10,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  dateRange: {
+    fontSize: 9,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 6,
   },
   infoRow: {
     flexDirection: 'row',
-    marginTop: 5,
+    marginBottom: 3,
   },
   infoLabel: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#6b7280',
-    width: 80,
+    width: 60,
+    fontWeight: 'bold',
   },
   infoValue: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#111827',
     flex: 1,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#111827',
-    backgroundColor: '#f3f4f6',
-    padding: 8,
-  },
-  activityCard: {
-    marginBottom: 15,
-    padding: 10,
-    backgroundColor: '#f9fafb',
-    borderRadius: 4,
-  },
-  activityTitle: {
+  
+  // Day section styles
+  dayHeader: {
     fontSize: 12,
     fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  activityTime: {
-    fontSize: 10,
-    color: '#4b5563',
-    marginBottom: 5,
-  },
-  activityLocation: {
-    fontSize: 10,
-    color: '#4b5563',
-    marginBottom: 5,
-  },
-  activityDescription: {
-    fontSize: 10,
+    marginTop: 15,
+    marginBottom: 8,
     color: '#111827',
-    lineHeight: 1.5,
+    backgroundColor: '#f8fafc',
+    padding: 6,
+    borderLeft: '3 solid #10b981',
   },
-  footer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 30,
-    right: 30,
-    fontSize: 8,
-    color: '#9ca3af',
-    textAlign: 'center',
-    paddingTop: 10,
-    borderTop: '1 solid #e5e7eb',
+  dayDate: {
+    fontSize: 9,
+    color: '#6b7280',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
-  pageNumber: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    fontSize: 8,
-    color: '#9ca3af',
-  },
-  hotelCard: {
-    marginBottom: 15,
-    padding: 10,
-    backgroundColor: '#f8f9fa', // Light gray background instead of green
+  
+  // Route section styles (highlighted and first)
+  routeCard: {
+    marginBottom: 8,
+    padding: 8,
+    backgroundColor: '#dbeafe',
     borderRadius: 4,
-    border: '1 solid #e0e0e0',
+    border: '1 solid #3b82f6',
+  },
+  routeTitle: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1e40af',
+    marginBottom: 3,
+  },
+  routeDescription: {
+    fontSize: 8,
+    color: '#4b5563',
+    marginBottom: 4,
+    lineHeight: 1.3,
+    fontStyle: 'italic',
+  },
+  transportInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 4,
+    borderRadius: 3,
+    marginTop: 2,
+  },
+  transportBadge: {
+    backgroundColor: '#3b82f6',
+    color: '#ffffff',
+    fontSize: 7,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  noTransportText: {
+    fontSize: 8,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  
+  // Hotel section styles (after routes)
+  hotelCard: {
+    marginBottom: 8,
+    padding: 8,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 4,
+    border: '1 solid #bbf7d0',
   },
   hotelTitle: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 'bold',
     marginBottom: 2,
-    color: '#333333', // Darker text color for better contrast
+    color: '#166534',
   },
-  hotelDetails: {
-    fontSize: 10,
-    color: '#4b5563',
-    marginBottom: 2,
+  hotelAddress: {
+    fontSize: 7,
+    color: '#6b7280',
+    marginBottom: 1,
+  },
+  hotelLocation: {
+    fontSize: 7,
+    color: '#6b7280',
+    marginBottom: 3,
   },
   starRating: {
     flexDirection: 'row',
-    marginBottom: 2,
-  },
-  star: {
-    width: 8,
-    height: 8,
-    marginRight: 2,
-  },
-  cabTypeCard: {
-    marginBottom: 15,
-    padding: 10,
-    backgroundColor: '#f0f7ff', // Light blue background
-    borderRadius: 4,
-    border: '1 solid #bfdbfe', // Blue border
-  },
-  cabTypeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#1e40af', // Darker blue for better contrast
-    marginBottom: 2,
-  },
-  routeDetails: {
-    fontSize: 10,
-    color: '#4b5563',
-    marginBottom: 2,
-  },
-  routeDescription: {
-    fontSize: 9,
-    color: '#4b5563',
+    alignItems: 'center',
     marginBottom: 4,
-    fontStyle: 'italic',
   },
+  starText: {
+    fontSize: 7,
+    color: '#f59e0b',
+    marginLeft: 2,
+  },
+  roomDetails: {
+    backgroundColor: '#ffffff',
+    padding: 4,
+    borderRadius: 3,
+    marginTop: 3,
+    borderTop: '1 solid #d1fae5',
+  },
+  roomDetailRow: {
+    flexDirection: 'row',
+    marginBottom: 1,
+  },
+  roomLabel: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    color: '#374151',
+    width: 45,
+  },
+  roomValue: {
+    fontSize: 7,
+    color: '#111827',
+    flex: 1,
+  },
+  
+  // Notes section
   notesCard: {
-    marginBottom: 15,
-    padding: 10,
-    backgroundColor: '#fffbeb', // Light yellow background
-    borderRadius: 4,
-    border: '1 solid #fef3c7', // Yellow border
+    marginBottom: 8,
+    padding: 6,
+    backgroundColor: '#fffbeb',
+    borderRadius: 3,
+    border: '1 solid #fef3c7',
   },
   notesTitle: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: 'bold',
-    color: '#92400e', // Amber text
-    marginBottom: 4,
+    color: '#92400e',
+    marginBottom: 3,
   },
   notesText: {
-    fontSize: 9,
+    fontSize: 7,
     color: '#4b5563',
-    lineHeight: 1.4,
+    lineHeight: 1.3,
   },
-  pricingSection: {
-    marginTop: 20,
-    marginBottom: 10,
+  
+  // Activity styles
+  activityCard: {
+    marginBottom: 6,
+    padding: 6,
+    backgroundColor: '#f9fafb',
+    borderRadius: 3,
+    borderLeft: '2 solid #e5e7eb',
   },
-  pricingTitle: {
-    fontSize: 14,
+  activityTitle: {
+    fontSize: 8,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 2,
+    color: '#111827',
+  },
+  activityTime: {
+    fontSize: 7,
+    color: '#4b5563',
+    marginBottom: 1,
+  },
+  activityLocation: {
+    fontSize: 7,
+    color: '#4b5563',
+    marginBottom: 1,
+  },
+  activityDescription: {
+    fontSize: 7,
+    color: '#111827',
+    lineHeight: 1.3,
+  },
+  
+  // Section title
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginTop: 15,
+    marginBottom: 6,
     color: '#111827',
     backgroundColor: '#f3f4f6',
-    padding: 8,
+    padding: 6,
+  },
+  
+  // Pricing styles
+  pricingSection: {
+    marginTop: 15,
+    marginBottom: 8,
+  },
+  pricingTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    color: '#111827',
+    backgroundColor: '#f3f4f6',
+    padding: 6,
   },
   pricingCard: {
-    padding: 10,
-    backgroundColor: '#f0fff4', // Light green background
-    borderRadius: 4,
-    border: '1 solid #c6f6d5', // Green border
+    padding: 6,
+    backgroundColor: '#f0fff4',
+    borderRadius: 3,
+    border: '1 solid #c6f6d5',
   },
   pricingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   pricingLabel: {
-    fontSize: 10,
+    fontSize: 7,
     color: '#4b5563',
   },
   pricingValue: {
-    fontSize: 10,
+    fontSize: 7,
     color: '#111827',
     textAlign: 'right',
   },
   pricingDivider: {
     borderBottom: '1 dashed #e5e7eb',
-    marginVertical: 4,
+    marginVertical: 3,
   },
   pricingTotal: {
     flexDirection: 'row',
@@ -247,40 +320,62 @@ const styles = StyleSheet.create({
     borderTop: '1 solid #e5e7eb',
   },
   pricingTotalLabel: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 'bold',
     color: '#111827',
   },
   pricingTotalValue: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 'bold',
-    color: '#047857', // Green color for total
+    color: '#047857',
     textAlign: 'right',
   },
+  
+  // Terms styles
   termsSection: {
-    marginBottom: 15,
+    marginBottom: 8,
   },
   termsSubtitle: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 4,
     color: '#111827',
   },
   termsItem: {
     flexDirection: 'row',
-    marginBottom: 4,
-    paddingLeft: 10,
+    marginBottom: 2,
+    paddingLeft: 6,
   },
   bulletPoint: {
-    fontSize: 10,
-    marginRight: 5,
+    fontSize: 7,
+    marginRight: 3,
     color: '#111827',
   },
   termsText: {
-    fontSize: 10,
+    fontSize: 7,
     color: '#111827',
     flex: 1,
-    lineHeight: 1.4,
+    lineHeight: 1.3,
+  },
+  
+  // Footer styles
+  footer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    fontSize: 6,
+    color: '#9ca3af',
+    textAlign: 'center',
+    paddingTop: 6,
+    borderTop: '1 solid #e5e7eb',
+  },
+  pageNumber: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    fontSize: 6,
+    color: '#9ca3af',
   },
 });
 
@@ -479,13 +574,21 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
           .select('*')
           .single();
 
-        if (error) throw error;
+        if (error) {
+          if (error.code !== 'PGRST116') {
+            console.error('Error fetching terms and conditions:', error);
+          }
+          return;
+        }
+        
         if (data) {
-          setTermsAndConditions({
+          const terms = {
             inclusions: data.inclusions || [],
             exclusions: data.exclusions || [],
             terms: data.terms || []
-          });
+          };
+          console.log('PDF Terms fetched:', terms);
+          setTermsAndConditions(terms);
         }
       } catch (error) {
         console.error('Error fetching terms and conditions:', error);
@@ -528,33 +631,32 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>{itinerary.name}</Text>
-          <Text style={styles.subtitle}>{itinerary.destination || 'No destination specified'}</Text>
+          {itinerary.destination && (
+            <Text style={styles.subtitle}>📍 {itinerary.destination}</Text>
+          )}
+          {itinerary.start_date && itinerary.end_date && (
+            <Text style={styles.dateRange}>
+              🗓️ {new Date(itinerary.start_date).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })} - {new Date(itinerary.end_date).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+            </Text>
+          )}
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Client:</Text>
             <Text style={styles.infoValue}>{itinerary.customers?.name || 'Not assigned'}</Text>
           </View>
           
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Duration:</Text>
-            <Text style={styles.infoValue}>
-              {itinerary.duration ? `${itinerary.duration} days` : 'Not specified'}
-            </Text>
-          </View>
-          
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Dates:</Text>
-            <Text style={styles.infoValue}>
-              {itinerary.start_date && itinerary.end_date
-                ? `${new Date(itinerary.start_date).toLocaleDateString()} - ${new Date(itinerary.end_date).toLocaleDateString()}`
-                : 'No dates specified'}
-            </Text>
-          </View>
-          
-          {itinerary.budget && (
+          {itinerary.duration && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Budget:</Text>
-              <Text style={styles.infoValue}>₹{itinerary.budget.toLocaleString()}</Text>
+              <Text style={styles.infoLabel}>Duration:</Text>
+              <Text style={styles.infoValue}>{itinerary.duration} day{itinerary.duration > 1 ? 's' : ''}</Text>
             </View>
           )}
         </View>
@@ -565,55 +667,70 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
           
           return (
             <View key={day.id}>
-              <Text style={styles.sectionTitle}>
-                Day {day.day_number} {day.date ? `- ${format(new Date(day.date), 'EEEE, MMMM d, yyyy')}` : ''}
-              </Text>
+              <View style={styles.dayHeader}>
+                <Text>Day {day.day_number}</Text>
+                {day.date && (
+                  <Text style={styles.dayDate}>
+                    {format(new Date(day.date), 'EEEE, MMMM d, yyyy')}
+                  </Text>
+                )}
+              </View>
               
-              {/* Hotel Information */}
-              {day.hotel && (
-                <View style={styles.hotelCard}>
-                  <Text style={styles.hotelTitle}>Accommodation: {day.hotel.name}</Text>
-                  <Text style={styles.hotelDetails}>{day.hotel.address}</Text>
-                  <Text style={styles.hotelDetails}>{day.hotel.city}, {day.hotel.state}, {day.hotel.country}</Text>
-                  <View style={styles.starRating}>
-                    <Text style={styles.hotelDetails}>Rating: {day.hotel.star_category} {day.hotel.star_category === 1 ? 'Star' : 'Stars'}</Text>
-                  </View>
-                  {day.hotel.phone && <Text style={styles.hotelDetails}>Phone: {day.hotel.phone}</Text>}
-                  {(day.room_type || day.meal_plan) && (
-                    <View style={{ marginTop: 4, paddingTop: 4, borderTop: '1 solid #e0e0e0' }}>
-                      {day.room_type && (
-                        <Text style={styles.hotelDetails}>Room: {day.room_type}</Text>
-                      )}
-                      {day.meal_plan && (
-                        <Text style={styles.hotelDetails}>Meal Plan: {day.meal_plan}</Text>
-                      )}
-                      {/* Room price is hidden from customers */}
+              {/* Route Information FIRST (as requested) */}
+              {day.route_name && (
+                <View style={styles.routeCard}>
+                  <Text style={styles.routeTitle}>🚗 Route: {day.route_name}</Text>
+                  {day.route_description && (
+                    <Text style={styles.routeDescription}>{day.route_description}</Text>
+                  )}
+                  {day.cab_type ? (
+                    <View style={styles.transportInfo}>
+                      <Text style={styles.transportBadge}>
+                        {getCabTypeLabel(day.cab_type)}
+                        {day.cab_quantity > 1 && ` x${day.cab_quantity}`}
+                      </Text>
                     </View>
+                  ) : (
+                    <Text style={styles.noTransportText}>No transport type selected</Text>
                   )}
                 </View>
               )}
               
-              {/* Cab Type Information - Updated to include route description but hide prices */}
-              {(day.route_name || day.cab_type) && (
-                <View style={styles.cabTypeCard}>
-                  {day.route_name ? (
-                    <>
-                      <Text style={styles.cabTypeText}>Route: {day.route_name}</Text>
-                      {day.route_description && (
-                        <Text style={styles.routeDescription}>{day.route_description}</Text>
+              {/* Hotel Information SECOND (after routes) */}
+              {day.hotel && (
+                <View style={styles.hotelCard}>
+                  <Text style={styles.hotelTitle}>🏨 Accommodation: {day.hotel.name}</Text>
+                  <Text style={styles.hotelAddress}>{day.hotel.address}</Text>
+                  <Text style={styles.hotelLocation}>{day.hotel.city}, {day.hotel.state}, {day.hotel.country}</Text>
+                  <View style={styles.starRating}>
+                    <Text style={styles.starText}>
+                      {'⭐'.repeat(day.hotel.star_category)} {day.hotel.star_category} {day.hotel.star_category === 1 ? 'Star' : 'Stars'}
+                    </Text>
+                  </View>
+                  {(day.room_type || day.meal_plan) && (
+                    <View style={styles.roomDetails}>
+                      {day.room_type && (
+                        <View style={styles.roomDetailRow}>
+                          <Text style={styles.roomLabel}>Room:</Text>
+                          <Text style={styles.roomValue}>
+                            {day.room_type}
+                            {day.room_quantity > 1 && ` x${day.room_quantity}`}
+                          </Text>
+                        </View>
                       )}
-                      {day.cab_type ? (
-                        <Text style={styles.routeDetails}>
-                          Transport: {day.cab_type}
-                          {day.cab_quantity > 1 && ` x${day.cab_quantity}`}
-                          {/* Cab price is hidden from customers */}
-                        </Text>
-                      ) : (
-                        <Text style={styles.routeDetails}>No transport type selected</Text>
+                      {day.meal_plan && (
+                        <View style={styles.roomDetailRow}>
+                          <Text style={styles.roomLabel}>Meal Plan:</Text>
+                          <Text style={styles.roomValue}>
+                            {day.meal_plan === "CP" ? "CP (Room Only)" : 
+                             day.meal_plan === "MAP" ? "MAP (Breakfast + Dinner)" :
+                             day.meal_plan === "AP" ? "AP (All Meals)" :
+                             day.meal_plan === "EP" ? "EP (Breakfast Only)" : 
+                             day.meal_plan}
+                          </Text>
+                        </View>
                       )}
-                    </>
-                  ) : (
-                    <Text style={styles.cabTypeText}>Transport Type: {getCabTypeLabel(day.cab_type || '')}</Text>
+                    </View>
                   )}
                 </View>
               )}
@@ -621,18 +738,19 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
               {/* Day Notes */}
               {day.notes && (
                 <View style={styles.notesCard}>
-                  <Text style={styles.notesTitle}>Day Notes:</Text>
+                  <Text style={styles.notesTitle}>📝 Day Notes:</Text>
                   <Text style={styles.notesText}>{day.notes}</Text>
                 </View>
               )}
               
+              {/* Activities */}
               {dayActivities.length > 0 && dayActivities.map((activity: any) => (
                 <View key={activity.id} style={styles.activityCard}>
                   <Text style={styles.activityTitle}>{activity.title}</Text>
                   
                   {(activity.time_start || activity.time_end) && (
                     <Text style={styles.activityTime}>
-                      Time: {' '}
+                      🕐 Time: {' '}
                       {activity.time_start && format(new Date(`2000-01-01T${activity.time_start}`), 'h:mm a')}
                       {activity.time_start && activity.time_end && " - "}
                       {activity.time_end && format(new Date(`2000-01-01T${activity.time_end}`), 'h:mm a')}
@@ -641,7 +759,7 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
                   
                   {activity.location && (
                     <Text style={styles.activityLocation}>
-                      Location: {activity.location}
+                      📍 Location: {activity.location}
                     </Text>
                   )}
                   
@@ -720,7 +838,7 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
             </View>
             
             {pricingOptions?.showPerPersonPrice && itinerary.customers?.adults && (
-              <Text style={{ fontSize: 8, color: '#4b5563', textAlign: 'right', marginTop: 4 }}>
+              <Text style={{ fontSize: 6, color: '#4b5563', textAlign: 'right', marginTop: 2 }}>
                 Based on {itinerary.customers.adults} {itinerary.customers.adults === 1 ? "adult" : "adults"}
               </Text>
             )}
@@ -728,56 +846,63 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
         </View>
         
         {/* Terms & Conditions Section */}
-        {termsAndConditions.inclusions.length > 0 || termsAndConditions.exclusions.length > 0 || termsAndConditions.terms.length > 0 ? (
-          <>
-            <Text style={styles.sectionTitle}>Terms & Conditions</Text>
-            
-            {/* Inclusions */}
-            {termsAndConditions.inclusions.length > 0 && (
-              <View style={styles.termsSection}>
-                <Text style={styles.termsSubtitle}>Inclusions:</Text>
-                {termsAndConditions.inclusions.map((inclusion, index) => (
-                  <View key={index} style={styles.termsItem}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.termsText}>{inclusion}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+        <View style={styles.termsSection}>
+          <Text style={styles.sectionTitle}>Terms & Conditions</Text>
+          
+          {/* Inclusions */}
+          {termsAndConditions.inclusions.length > 0 && (
+            <View style={styles.termsSection}>
+              <Text style={styles.termsSubtitle}>✓ Inclusions:</Text>
+              {termsAndConditions.inclusions.map((inclusion, index) => (
+                <View key={index} style={styles.termsItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.termsText}>{inclusion}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
-            {/* Exclusions */}
-            {termsAndConditions.exclusions.length > 0 && (
-              <View style={styles.termsSection}>
-                <Text style={styles.termsSubtitle}>Exclusions:</Text>
-                {termsAndConditions.exclusions.map((exclusion, index) => (
-                  <View key={index} style={styles.termsItem}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.termsText}>{exclusion}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+          {/* Exclusions */}
+          {termsAndConditions.exclusions.length > 0 && (
+            <View style={styles.termsSection}>
+              <Text style={styles.termsSubtitle}>✗ Exclusions:</Text>
+              {termsAndConditions.exclusions.map((exclusion, index) => (
+                <View key={index} style={styles.termsItem}>
+                  <Text style={styles.bulletPoint}>•</Text>
+                  <Text style={styles.termsText}>{exclusion}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
-            {/* Terms & Conditions */}
-            {termsAndConditions.terms.length > 0 && (
-              <View style={styles.termsSection}>
-                <Text style={styles.termsSubtitle}>Terms & Conditions:</Text>
-                {termsAndConditions.terms.map((term, index) => (
-                  <View key={index} style={styles.termsItem}>
-                    <Text style={styles.bulletPoint}>•</Text>
-                    <Text style={styles.termsText}>{term}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </>
-        ) : null}
+          {/* Terms & Conditions */}
+          {termsAndConditions.terms.length > 0 && (
+            <View style={styles.termsSection}>
+              <Text style={styles.termsSubtitle}>📋 Terms & Conditions:</Text>
+              {termsAndConditions.terms.map((term, index) => (
+                <View key={index} style={styles.termsItem}>
+                  <Text style={styles.bulletPoint}>{index + 1}.</Text>
+                  <Text style={styles.termsText}>{term}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          
+          {/* Show placeholder if no terms are available */}
+          {termsAndConditions.inclusions.length === 0 && 
+           termsAndConditions.exclusions.length === 0 && 
+           termsAndConditions.terms.length === 0 && (
+            <View style={styles.termsSection}>
+              <Text style={styles.termsText}>Terms and conditions will be added from the Settings page.</Text>
+            </View>
+          )}
+        </View>
         
         {/* Notes */}
         {itinerary.notes && (
           <>
             <Text style={styles.sectionTitle}>Notes</Text>
-            <Text style={{ fontSize: 10, lineHeight: 1.5 }}>{itinerary.notes}</Text>
+            <Text style={{ fontSize: 7, lineHeight: 1.3 }}>{itinerary.notes}</Text>
           </>
         )}
         
