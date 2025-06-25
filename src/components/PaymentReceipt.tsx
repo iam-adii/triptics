@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
 import { format } from 'date-fns';
+import { getLogoAsBase64, LOGO_STYLES } from '../utils/logoUtils';
 
 // Register fonts
 Font.register({
@@ -200,6 +201,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     color: '#10B981',
   },
+  urbanMonkLogo: LOGO_STYLES,
   footer: {
     marginTop: 30,
     borderTopWidth: 1,
@@ -291,6 +293,18 @@ interface PaymentReceiptProps {
 }
 
 const PaymentReceipt: React.FC<PaymentReceiptProps> = ({ payment, showPaid = true, companySettings, avatarUrl }) => {
+  // State for logo
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  
+  // Load logo on component mount
+  useEffect(() => {
+    const loadLogo = async () => {
+      const logo = await getLogoAsBase64();
+      setLogoBase64(logo);
+    };
+    loadLogo();
+  }, []);
+  
   // Format currency function
   const formatCurrency = (amount: number) => {
     return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -327,6 +341,9 @@ const PaymentReceipt: React.FC<PaymentReceiptProps> = ({ payment, showPaid = tru
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {/* Urban Monk Logo - Top Right */}
+        {logoBase64 && <Image src={logoBase64} style={styles.urbanMonkLogo} />}
+        
         {/* Watermark for status */}
         {showPaid && payment.status === 'Completed' && (
           <Text style={styles.status}>PAID</Text>

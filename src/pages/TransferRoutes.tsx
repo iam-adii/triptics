@@ -471,44 +471,86 @@ export default function TransferRoutes() {
                 <Plus className="mr-2 h-4 w-4" /> Add Route
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{isEditMode ? "Edit Route" : "Add New Route"}</DialogTitle>
-                <DialogDescription>
+            <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-xl font-semibold">
+                  {isEditMode ? "Edit Route" : "Add New Route"}
+                </DialogTitle>
+                <DialogDescription className="text-base">
                   {isEditMode 
                     ? "Update the details for this transfer route." 
                     : "Create a new transfer route for your itineraries."}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label htmlFor="route-name">Route Name</Label>
-                  <Input
-                    id="route-name"
-                    placeholder="e.g., Delhi to Agra"
-                    value={newRoute.name}
-                    onChange={(e) => setNewRoute({ ...newRoute, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="route-description">Description (Optional)</Label>
-                  <Textarea
-                    id="route-description"
-                    placeholder="Describe the route, landmarks, etc."
-                    value={newRoute.description}
-                    onChange={(e) => setNewRoute({ ...newRoute, description: e.target.value })}
-                    rows={3}
-                  />
+              
+              <div className="space-y-6 py-4">
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    Route Information
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="route-name" className="text-sm font-medium">
+                        Route Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="route-name"
+                        placeholder="e.g., Delhi to Agra, Mumbai to Pune"
+                        value={newRoute.name}
+                        onChange={(e) => setNewRoute({ ...newRoute, name: e.target.value })}
+                        className="h-10"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Use a clear, descriptive name for the route
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="route-description" className="text-sm font-medium">
+                        Description <span className="text-muted-foreground">(Optional)</span>
+                      </Label>
+                      <Textarea
+                        id="route-description"
+                        placeholder="Describe the route, important landmarks, distance, or any special notes..."
+                        value={newRoute.description}
+                        onChange={(e) => setNewRoute({ ...newRoute, description: e.target.value })}
+                        rows={4}
+                        className="resize-none"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Add details that will help identify or understand this route
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Preview Section */}
+                  {newRoute.name && (
+                    <div className="pt-4 border-t border-border">
+                      <h5 className="text-sm font-medium text-muted-foreground mb-2">Preview</h5>
+                      <div className="bg-muted/50 p-3 rounded-md space-y-1">
+                        <div className="font-medium">{newRoute.name}</div>
+                        {newRoute.description && (
+                          <div className="text-sm text-muted-foreground">{newRoute.description}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsRouteDialogOpen(false)}>
+              
+              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 pt-6 border-t border-border">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsRouteDialogOpen(false)}
+                  className="w-full sm:w-auto"
+                >
                   Cancel
                 </Button>
                 <Button 
                   onClick={handleSaveRoute} 
                   disabled={isSavingRoute || !newRoute.name.trim()}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white w-full sm:w-auto"
                 >
                   {isSavingRoute ? (
                     <>
@@ -540,87 +582,175 @@ export default function TransferRoutes() {
                 <Plus className="mr-2 h-4 w-4" /> Add Cab Type
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{isEditMode ? "Edit Cab Type" : "Add New Cab Type"}</DialogTitle>
-                <DialogDescription>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-xl font-semibold">
+                  {isEditMode ? "Edit Cab Type" : "Add New Cab Type"}
+                </DialogTitle>
+                <DialogDescription className="text-base">
                   {isEditMode 
                     ? "Update the details for this cab type." 
                     : "Create a new cab type for a transfer route."}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label htmlFor="route-select">Select Route</Label>
-                  <select
-                    id="route-select"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                    value={newCabType.route_id || ""}
-                    onChange={(e) => setNewCabType({ ...newCabType, route_id: e.target.value })}
-                  >
-                    <option value="" disabled>Select a route</option>
-                    {transferRoutes.map((route) => (
-                      <option key={route.id} value={route.id}>
-                        {route.name}
-                      </option>
-                    ))}
-                  </select>
+              
+              <div className="space-y-6 py-4">
+                {/* Basic Information Section */}
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    Basic Information
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="route-select" className="text-sm font-medium">
+                        Select Route <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        id="route-select"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={newCabType.route_id || ""}
+                        onChange={(e) => setNewCabType({ ...newCabType, route_id: e.target.value })}
+                      >
+                        <option value="" disabled>Select a route</option>
+                        {transferRoutes.map((route) => (
+                          <option key={route.id} value={route.id}>
+                            {route.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="cab-type-name" className="text-sm font-medium">
+                        Cab Type Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="cab-type-name"
+                        placeholder="e.g., Innova, Tempo Traveller"
+                        value={newCabType.name}
+                        onChange={(e) => setNewCabType({ ...newCabType, name: e.target.value })}
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="cab-type-price" className="text-sm font-medium">
+                      Price (₹) <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                      <Input
+                        id="cab-type-price"
+                        type="number"
+                        placeholder="0.00"
+                        value={newCabType.price || ""}
+                        onChange={(e) => setNewCabType({ ...newCabType, price: parseFloat(e.target.value) || 0 })}
+                        className="pl-8 h-10"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cab-type-name">Cab Type Name</Label>
-                  <Input
-                    id="cab-type-name"
-                    placeholder="e.g., Innova"
-                    value={newCabType.name}
-                    onChange={(e) => setNewCabType({ ...newCabType, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cab-type-price">Price (₹)</Label>
-                  <Input
-                    id="cab-type-price"
-                    type="number"
-                    placeholder="Price in rupees"
-                    value={newCabType.price}
-                    onChange={(e) => setNewCabType({ ...newCabType, price: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="season-name">Season Name</Label>
-                  <Input
-                    id="season-name"
-                    placeholder="e.g., Peak Season"
-                    value={newCabType.season_name}
-                    onChange={(e) => setNewCabType({ ...newCabType, season_name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="season-start">Season Start</Label>
-                  <Input
-                    id="season-start"
-                    type="date"
-                    value={newCabType.season_start}
-                    onChange={(e) => setNewCabType({ ...newCabType, season_start: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="season-end">Season End</Label>
-                  <Input
-                    id="season-end"
-                    type="date"
-                    value={newCabType.season_end}
-                    onChange={(e) => setNewCabType({ ...newCabType, season_end: e.target.value })}
-                  />
+
+                {/* Seasonal Pricing Section */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                      Seasonal Pricing (Optional)
+                    </h4>
+                    <Badge variant="outline" className="text-xs">
+                      Leave blank for standard pricing
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="season-name" className="text-sm font-medium">
+                        Season Name
+                      </Label>
+                      <Input
+                        id="season-name"
+                        placeholder="e.g., Peak Season, Off Season, Festival Season"
+                        value={newCabType.season_name || ""}
+                        onChange={(e) => setNewCabType({ ...newCabType, season_name: e.target.value })}
+                        className="h-10"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="season-start" className="text-sm font-medium">
+                          Season Start Date
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="season-start"
+                            type="date"
+                            value={newCabType.season_start || ""}
+                            onChange={(e) => setNewCabType({ ...newCabType, season_start: e.target.value })}
+                            className="h-10 cursor-pointer"
+                            max={newCabType.season_end || undefined}
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="season-end" className="text-sm font-medium">
+                          Season End Date
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="season-end"
+                            type="date"
+                            value={newCabType.season_end || ""}
+                            onChange={(e) => setNewCabType({ ...newCabType, season_end: e.target.value })}
+                            className="h-10 cursor-pointer"
+                            min={newCabType.season_start || undefined}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {(newCabType.season_start || newCabType.season_end) && (
+                      <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+                        <span className="font-medium">Season Duration:</span>{" "}
+                        {newCabType.season_start 
+                          ? new Date(newCabType.season_start).toLocaleDateString('en-IN', { 
+                              day: 'numeric', 
+                              month: 'short',
+                              year: 'numeric'
+                            })
+                          : "Any date"
+                        } to{" "}
+                        {newCabType.season_end 
+                          ? new Date(newCabType.season_end).toLocaleDateString('en-IN', { 
+                              day: 'numeric', 
+                              month: 'short',
+                              year: 'numeric'
+                            })
+                          : "Any date"
+                        }
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsCabTypeDialogOpen(false)}>
+              
+              <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 pt-6 border-t border-border">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsCabTypeDialogOpen(false)}
+                  className="w-full sm:w-auto"
+                >
                   Cancel
                 </Button>
                 <Button 
                   onClick={handleSaveCabType} 
                   disabled={isSavingCabType || !newCabType.name.trim() || !newCabType.route_id}
-                  className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white w-full sm:w-auto"
                 >
                   {isSavingCabType ? (
                     <>

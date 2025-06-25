@@ -86,6 +86,15 @@ export const generatePDFFromHTML = async ({
       format: 'a4',
     });
     
+    // Add Urban Monk logo to top right
+    try {
+      const logoPath = '/assets/logos/urban-monk-logo.png.png';
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      pdf.addImage(logoPath, 'PNG', pdfWidth - 125, 5, 120, 36);
+    } catch (logoError) {
+      console.warn('Error adding Urban Monk logo to PDF:', logoError);
+    }
+    
     // Get dimensions
     const imgData = canvas.toDataURL('image/png');
     const imgProps = pdf.getImageProperties(imgData);
@@ -200,6 +209,14 @@ export async function generatePDF({ title, content, avatarUrl }: GeneratePDFOpti
     pdf.setDrawColor(230, 230, 230);
     pdf.setLineWidth(0.5);
     pdf.rect(5, 5, pageWidth - 10, pageHeight - 10);
+    
+    // Add Urban Monk logo to top right
+    try {
+      const logoPath = '/assets/logos/urban-monk-logo.png.png';
+      pdf.addImage(logoPath, 'PNG', pageWidth - 125, 5, 120, 36);
+    } catch (logoError) {
+      console.warn('Error adding Urban Monk logo to PDF:', logoError);
+    }
     
     // Add company details
     pdf.setFontSize(20);

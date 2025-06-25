@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Document,
   Page,
@@ -9,6 +9,7 @@ import {
   Font,
 } from '@react-pdf/renderer';
 import { format } from 'date-fns';
+import { getLogoAsBase64, LOGO_STYLES } from '../utils/logoUtils';
 
 // Register fonts
 Font.register({
@@ -114,10 +115,23 @@ const styles = StyleSheet.create({
     borderTopStyle: 'solid',
     paddingTop: 10,
   },
+  urbanMonkLogo: LOGO_STYLES,
 });
 
 // TransferDetails PDF component
 const TransferDetails = ({ transfer, companySettings }: any) => {
+  // State for logo
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  
+  // Load logo on component mount
+  useEffect(() => {
+    const loadLogo = async () => {
+      const logo = await getLogoAsBase64();
+      setLogoBase64(logo);
+    };
+    loadLogo();
+  }, []);
+  
   // Format date
   const formatDate = (dateString: string) => {
     try {
@@ -150,6 +164,9 @@ const TransferDetails = ({ transfer, companySettings }: any) => {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {/* Urban Monk Logo - Top Right */}
+        {logoBase64 && <Image src={logoBase64} style={styles.urbanMonkLogo} />}
+        
         {/* Header with company info */}
         <View style={styles.header}>
           <View>

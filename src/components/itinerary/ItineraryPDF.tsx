@@ -10,6 +10,7 @@ import {
 } from '@react-pdf/renderer';
 import { format } from 'date-fns';
 import { supabase } from '../../lib/supabase';
+import { getLogoAsBase64, LOGO_STYLES } from '../../utils/logoUtils';
 
 // Register fonts
 Font.register({
@@ -49,6 +50,7 @@ const styles = StyleSheet.create({
     height: 50,
     objectFit: 'contain',
   },
+  urbanMonkLogo: LOGO_STYLES,
   companyName: {
     fontSize: 11,
     fontWeight: 'bold',
@@ -485,6 +487,18 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
   // Check if the avatar URL is valid
   const hasAvatar = Boolean(avatarUrl && avatarUrl.startsWith('http'));
   
+  // State for logo
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  
+  // Load logo on component mount
+  useEffect(() => {
+    const loadLogo = async () => {
+      const logo = await getLogoAsBase64();
+      setLogoBase64(logo);
+    };
+    loadLogo();
+  }, []);
+  
   // Cab type options
   const cabTypes = [
     { value: "WagonR/Hatchback", label: "WagonR/Hatchback" },
@@ -601,6 +615,9 @@ const ItineraryPDF: React.FC<ItineraryPDFProps> = ({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {/* Urban Monk Logo - Top Right */}
+        {logoBase64 && <Image src={logoBase64} style={styles.urbanMonkLogo} />}
+        
         {/* Company Header */}
         <View style={styles.companyHeader}>
           <View style={styles.companyInfo}>
